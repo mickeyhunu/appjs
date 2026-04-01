@@ -13,6 +13,48 @@ function isValidName(value) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 20;
 }
 
+exports.getLive = async (req, res) => {
+  const { storeNo, roomNo } = req.params;
+
+  if (!isValidStoreNo(storeNo)) {
+    return res.status(400).json({ error: '유효한 storeNo가 필요합니다.' });
+  }
+
+  if (!isValidRoomNo(roomNo)) {
+    return res.status(400).json({ error: 'roomNo는 3자리 숫자 또는 V1~V3 형식이어야 합니다.' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT storeNo, roomNo, salerName, waiterName, createdAt
+       FROM INFO_LIVE
+       WHERE storeNo = ? AND roomNo = ?
+       LIMIT 1`,
+      [Number(storeNo), roomNo]
+    );
+
+    const row = Array.isArray(rows) ? rows[0] : rows;
+
+    if (!row) {
+      return res.status(404).json({ error: '해당 storeNo/roomNo 데이터가 존재하지 않습니다.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        storeNo: row.storeNo,
+        roomNo: row.roomNo,
+        salerName: row.salerName,
+        waiterName: row.waiterName,
+        createdAt: row.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('[ERROR] getLive:', error);
+    return res.status(500).json({ error: 'INFO_LIVE 조회 중 오류가 발생했습니다.' });
+  }
+};
+
 exports.upsertLive = async (req, res) => {
   const { storeNo } = req.params;
   const { roomNo, salerName, waiterName } = req.body || {};

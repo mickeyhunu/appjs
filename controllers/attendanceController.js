@@ -7,11 +7,11 @@ const ORIGINAL_SHEET_NAME = "원본";
 const storeRanges = {
   "달토": "A2:E",
   "엘리트": "F2:J",
-  "퍼펙트": "K2:O",
+  "디저트": "K2:O",
   "유앤미": "P2:T",
   "도파민": "U2:Y",
   "제우스": "Z2:AD",
-  "퍼스트": "AE2:AI",
+  "드라마": "AE2:AI",
   "": "AJ2:AN",
   "": "AO2:AS",
   "독고": "AT2:AX",

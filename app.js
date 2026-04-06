@@ -4,6 +4,7 @@ const roomRouter = require('./routes/roomRouter');
 const infoChoiceRouter = require('./routes/infoChoiceRouter'); // 루트 경로
 const infoChojoongRouter = require('./routes/infoChojoongRoutes');
 const infoLiveRouter = require('./routes/infoLiveRouter');
+const infoOrderRouter = require('./routes/infoOrderRouter');
 const entryRouter = require('./routes/entryRouter');
 const attendanceRoutes = require("./routes/attendanceRoutes");
 
@@ -14,6 +15,7 @@ app.use('/api/info-room', roomRouter);
 app.use('/api/info-choice', infoChoiceRouter);
 app.use('/api/info-chojoong', infoChojoongRouter);
 app.use('/api/info-live', infoLiveRouter);
+app.use('/api/info-order', infoOrderRouter);
 app.use('/api/info-entry', entryRouter);
 app.use("/", attendanceRoutes);
 

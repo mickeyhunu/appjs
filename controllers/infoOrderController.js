@@ -6,7 +6,7 @@ function isValidStoreNo(value) {
 }
 
 function isValidRoomNo(value) {
-  return typeof value === 'string' && /^\d{3}$/.test(value.trim());
+  return typeof value === 'string' && /^(\d{3}|V[123])$/.test(value.trim().toUpperCase());
 }
 
 function isValidSendMsg(value) {
@@ -31,7 +31,7 @@ exports.createOrder = async (req, res) => {
   }
 
   if (!isValidRoomNo(roomNo)) {
-    return res.status(400).json({ error: 'roomNo는 3자리 숫자 형식이어야 합니다.' });
+    return res.status(400).json({ error: 'roomNo는 3자리 숫자 또는 V1~V3 형식이어야 합니다.' });
   }
 
   if (!isValidSendMsg(sendMsg)) {
@@ -46,7 +46,7 @@ exports.createOrder = async (req, res) => {
     return res.status(400).json({ error: 'status는 READY, DONE, CANCEL 중 하나여야 합니다.' });
   }
 
-  const normalizedRoomNo = roomNo.trim();
+  const normalizedRoomNo = roomNo.trim().toUpperCase();
   const normalizedSendMsg = sendMsg.trim();
   const normalizedWaiterName = String(waiterName || '').trim();
   const normalizedStatus = status.trim().toUpperCase();

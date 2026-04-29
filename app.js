@@ -7,6 +7,7 @@ const infoLiveRouter = require('./routes/infoLiveRouter');
 const infoOrderRouter = require('./routes/infoOrderRouter');
 const entryRouter = require('./routes/entryRouter');
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const autoTalkRouter = require('./routes/autoTalkRouter');
 
 const app = express();
 app.use(express.json()); // JSON 바디 파싱
@@ -17,6 +18,7 @@ app.use('/api/info-chojoong', infoChojoongRouter);
 app.use('/api/info-live', infoLiveRouter);
 app.use('/api/info-order', infoOrderRouter);
 app.use('/api/info-entry', entryRouter);
+app.use('/api/auto-talk', autoTalkRouter);
 app.use("/", attendanceRoutes);
 
 // 서버 시작

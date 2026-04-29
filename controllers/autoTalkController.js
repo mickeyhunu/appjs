@@ -85,8 +85,12 @@ function formatBoardText(board) {
 
 async function saveChoiceEvent(req, res) {
   const payload = req.body || {};
-  const required = ['storeName', 'workerName', 'managerName', 'roomNo', 'eventType', 'dayKey'];
+  const managerName = String(payload.roomManagerName || payload.managerName || '').trim();
+  const roomName = String(payload.roomName || '').trim();
+
+  const required = ['storeName', 'workerName', 'roomNo', 'eventType', 'dayKey'];
   const missing = required.filter((field) => !String(payload[field] || '').trim());
+  if (!managerName) missing.push('roomManagerName');
 
   if (missing.length) {
     return res.status(400).json({ ok: false, error: `필수값 누락: ${missing.join(', ')}` });
@@ -106,7 +110,10 @@ async function saveChoiceEvent(req, res) {
     if (payload.eventType === 'START') {
       board.sessions.push({
         roomNo: payload.roomNo,
-        managerName: payload.managerName,
+        managerName,
+        roomName,
+        isJm: payload.isJm === true,
+        rawMessage: String(payload.rawMessage || ''),
         startAt,
         endCount: '',
         status: 'START'
@@ -122,7 +129,10 @@ async function saveChoiceEvent(req, res) {
       } else {
         board.sessions.push({
           roomNo: payload.roomNo,
-          managerName: payload.managerName,
+          managerName,
+          roomName,
+          isJm: payload.isJm === true,
+          rawMessage: String(payload.rawMessage || ''),
           startAt: '',
           endCount: payload.endCount || '',
           status: 'END'

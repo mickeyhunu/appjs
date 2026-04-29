@@ -9,6 +9,11 @@ function isValidRoomNo(value) {
   return typeof value === 'string' && /^(\d{3}|V[123])$/.test(value.trim().toUpperCase());
 }
 
+function isValidSenderName(value) {
+  if (value === null || value === undefined) return true;
+  return typeof value === 'string' && value.trim().length <= 20;
+}
+
 function isValidSendMsg(value) {
   return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 200;
 }
@@ -24,7 +29,7 @@ function isValidStatus(value) {
 }
 
 exports.createOrder = async (req, res) => {
-  const { storeNo, roomNo, sendMsg, waiterName = '', status = 'READY' } = req.body || {};
+  const { storeNo, roomNo, senderName = '', sendMsg, waiterName = '', status = 'READY' } = req.body || {};
 
   if (!isValidStoreNo(storeNo)) {
     return res.status(400).json({ error: '유효한 storeNo가 필요합니다.' });
@@ -32,6 +37,10 @@ exports.createOrder = async (req, res) => {
 
   if (!isValidRoomNo(roomNo)) {
     return res.status(400).json({ error: 'roomNo는 3자리 숫자 또는 V1~V3 형식이어야 합니다.' });
+  }
+
+  if (!isValidSenderName(senderName)) {
+    return res.status(400).json({ error: 'senderName은 0~20자의 문자열이어야 합니다.' });
   }
 
   if (!isValidSendMsg(sendMsg)) {
@@ -47,15 +56,16 @@ exports.createOrder = async (req, res) => {
   }
 
   const normalizedRoomNo = roomNo.trim().toUpperCase();
+  const normalizedSenderName = String(senderName || '').trim();
   const normalizedSendMsg = sendMsg.trim();
   const normalizedWaiterName = String(waiterName || '').trim();
   const normalizedStatus = status.trim().toUpperCase();
 
   try {
     const [result] = await db.execute(
-      `INSERT INTO INFO_ORDER (storeNo, roomNo, sendMsg, waiterName, status, createdAt)
-       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [Number(storeNo), normalizedRoomNo, normalizedSendMsg, normalizedWaiterName, normalizedStatus]
+      `INSERT INTO INFO_ORDER (storeNo, roomNo, senderName, sendMsg, waiterName, status, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [Number(storeNo), normalizedRoomNo, normalizedSenderName, normalizedSendMsg, normalizedWaiterName, normalizedStatus]
     );
 
     return res.status(201).json({
@@ -65,6 +75,7 @@ exports.createOrder = async (req, res) => {
         id: result.insertId,
         storeNo: Number(storeNo),
         roomNo: normalizedRoomNo,
+        senderName: normalizedSenderName,
         sendMsg: normalizedSendMsg,
         waiterName: normalizedWaiterName,
         status: normalizedStatus

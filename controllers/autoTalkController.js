@@ -111,7 +111,7 @@ async function saveManualBoard(req, res) {
 
   try {
     const [rows] = await db.execute(
-      `SELECT storeName, workerName, dayKey, totalCount, sessionsJson
+      `SELECT storeName, workerName, dayKey, roomName, totalCount, sessionsJson
        FROM AUTO_TALK
        WHERE dayKey = ?`,
       [dayKey]
@@ -125,6 +125,7 @@ async function saveManualBoard(req, res) {
           storeName: row.storeName,
           workerName: row.workerName,
           dayKey: row.dayKey,
+          roomNo: String(row.roomName || '').trim(),
           totalCount: Number(row.totalCount || 0),
           sessions: parsed.sessions,
           isE: parsed.isE
@@ -170,7 +171,7 @@ async function saveManualBoard(req, res) {
 }
 async function getOrCreateBoard(storeName, workerName, dayKey) {
   const [rows] = await db.execute(
-    `SELECT storeName, workerName, dayKey, totalCount, sessionsJson
+    `SELECT storeName, workerName, dayKey, roomName, totalCount, sessionsJson
      FROM AUTO_TALK
      WHERE storeName = ? AND workerName = ? AND dayKey = ?`,
     [storeName, workerName, dayKey]
@@ -182,24 +183,26 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
       storeName: row.storeName,
       workerName: row.workerName,
       dayKey: row.dayKey,
+      roomNo: String(row.roomName || '').trim(),
       totalCount: Number(row.totalCount || 0),
       ...parseSessionsPayload(row.sessionsJson)
     };
   }
 
-  const newBoard = { storeName, workerName, dayKey, totalCount: 0, sessions: [], isE: true };
+  const newBoard = { storeName, workerName, dayKey, roomNo: '', totalCount: 0, sessions: [], isE: true };
   await saveBoard(newBoard);
   return newBoard;
 }
 
 async function saveBoard(board) {
   await db.execute(
-    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, totalCount, sessionsJson)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, roomName, totalCount, sessionsJson)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
+      roomName = VALUES(roomName),
       totalCount = VALUES(totalCount),
       sessionsJson = VALUES(sessionsJson)`,
-    [board.storeName, board.workerName, board.dayKey, board.totalCount, JSON.stringify({ sessions: board.sessions, isE: board.isE !== false })]
+    [board.storeName, board.workerName, board.dayKey, board.roomNo || '', board.totalCount, JSON.stringify({ sessions: board.sessions, isE: board.isE !== false })]
   );
 }
 
@@ -273,7 +276,9 @@ async function saveChoiceEvent(req, res) {
   const managerName = String(payload.roomManagerName || payload.managerName || '').trim();
   const roomName = String(payload.roomName || '').trim();
 
-  const required = ['storeName', 'workerName', 'roomNo', 'eventType', 'dayKey'];
+  const eventType = String(payload.eventType || payload.status || '').trim().toUpperCase();
+
+  const required = ['storeName', 'workerName', 'roomNo', 'dayKey'];
   const missing = required.filter((field) => !String(payload[field] || '').trim());
   if (!managerName) missing.push('roomManagerName');
 
@@ -288,11 +293,12 @@ async function saveChoiceEvent(req, res) {
 
   try {
     const board = await getOrCreateBoard(payload.storeName, payload.workerName, dayKey);
+    board.roomNo = String(payload.roomNo || board.roomNo || '').trim();
 
     const now = new Date();
     const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    if (payload.eventType === 'START') {
+    if (eventType === 'START') {
       board.sessions.push({
         roomNo: payload.roomNo,
         managerName,
@@ -303,14 +309,19 @@ async function saveChoiceEvent(req, res) {
         endCount: '',
         status: 'START'
       });
-    } else if (payload.eventType === 'END') {
+    } else if (eventType === 'END') {
       const countValue = normalizeCountText(payload.endCount);
       board.totalCount += countValue;
 
       const lastOpen = [...board.sessions].reverse().find((s) => s.status === 'START' && s.roomNo === payload.roomNo);
       if (lastOpen) {
-        lastOpen.status = 'END';
+        lastOpen.roomNo = payload.roomNo;
+        lastOpen.managerName = managerName;
+        lastOpen.roomName = roomName;
+        lastOpen.isJm = payload.isJm === true;
+        lastOpen.rawMessage = String(payload.rawMessage || '');
         lastOpen.endCount = payload.endCount || '';
+        lastOpen.status = 'END';
       } else {
         board.sessions.push({
           roomNo: payload.roomNo,
@@ -324,7 +335,7 @@ async function saveChoiceEvent(req, res) {
         });
       }
     } else {
-      return res.status(400).json({ ok: false, error: `지원하지 않는 eventType: ${payload.eventType}` });
+      return res.status(400).json({ ok: false, error: `지원하지 않는 eventType: ${eventType}` });
     }
 
     await saveBoard(board);

@@ -1,18 +1,5 @@
 const db = require('../config/db');
 
-function toObjectBody(body) {
-  if (body && typeof body === 'object' && !Array.isArray(body)) return body;
-  if (typeof body === 'string') {
-    try {
-      const parsed = JSON.parse(body);
-      return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
-    } catch (error) {
-      return {};
-    }
-  }
-  return {};
-}
-
 // 한글 요일 표기용 상수(보드 헤더 생성 시 사용)
 const KOREAN_WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
@@ -247,7 +234,7 @@ async function saveChoiceEvent(req, res) {
   // 2) 보드 조회/생성
   // 3) START/END 이벤트에 따라 sessions 갱신
   // 4) 저장 후 응답
-  const payload = toObjectBody(req.body);
+  const payload = req.body || {};
   const roomManagerName = String(payload.roomManagerName || '').trim();
   const targetRoomName = String(payload.targetRoomName || '').trim();
 
@@ -344,14 +331,10 @@ async function renderChoiceBoard(req, res) {
 // API 3) saveManualBoard
 // =========================
 async function saveManualBoard(req, res) {
-  const payload = toObjectBody(req.body);
+  const payload = req.body || {};
   const targetRoomName = String(payload.targetRoomName || '').trim();
   const dayKey = parseDayKey(payload.dayKey);
-  const boardLines = Array.isArray(payload.boardLines)
-    ? payload.boardLines
-    : (typeof payload.boardText === 'string'
-      ? payload.boardText.split('\n').map((line) => ({ text: line }))
-      : null);
+  const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
 
   if (!targetRoomName || !dayKey || !boardLines) {
     return res.status(400).json({ ok: false, error: 'targetRoomName/dayKey/boardLines 필요' });
@@ -390,20 +373,8 @@ async function saveManualBoard(req, res) {
     let totalCount = 0;
 
     for (const line of boardLines) {
-      const text = String((line && (line.text || line.raw || line.message)) || line || '').trim();
-      if (!text) continue;
-
-      let parsed = findRoomAndManager(text);
-      if (!parsed) {
-        const loose = text.match(/(V\d+|\d{2,3})\s*T?\s+(.+?)\s+([\d.]+\s*ㄲ)(?:\s+ㅈㅁ)?$/);
-        if (loose) {
-          parsed = {
-            roomNo: loose[1],
-            roomManagerName: loose[2],
-            endCount: String(loose[3]).replace(/\s+/g, '')
-          };
-        }
-      }
+      const text = String((line && line.text) || '').trim();
+      const parsed = findRoomAndManager(text);
       if (!parsed) continue;
 
       totalCount += normalizeCountText(parsed.endCount);
@@ -417,10 +388,6 @@ async function saveManualBoard(req, res) {
         endCount: parsed.endCount,
         status: 'END'
       });
-    }
-
-    if (nextSessions.length === 0) {
-      return res.status(400).json({ ok: false, error: 'boardLines 파싱 실패: 유효한 라인이 없습니다.' });
     }
 
     board.sessions = nextSessions;

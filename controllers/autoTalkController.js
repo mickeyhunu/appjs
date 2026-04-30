@@ -129,7 +129,7 @@ function findRoomAndManager(text) {
 async function getOrCreateBoard(storeName, workerName, dayKey) {
   // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
-    `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
+    `SELECT storeName, workerName, dayKey, targetRoomName, isE, totalCount, sessionsJson
      FROM AUTO_TALK
      WHERE storeName = ? AND workerName = ? AND dayKey = ?`,
     [storeName, workerName, dayKey]
@@ -141,28 +141,30 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
       storeName: row.storeName,
       workerName: row.workerName,
       dayKey: row.dayKey,
-      roomNo: String(row.targetRoomName || '').trim(),
+      roomName: String(row.targetRoomName || '').trim(),
       totalCount: Number(row.totalCount || 0),
-      ...parseSessionsPayload(row.sessionsJson)
+      sessions: parseSessionsPayload(row.sessionsJson).sessions,
+      isE: row.isE === 1
     };
   }
 
   // 보드가 없으면 기존 이력에서 isE 기본값을 가져와 신규 보드 생성
   const isE = await resolveIsEForBoard(storeName, workerName, dayKey);
-  const newBoard = { storeName, workerName, dayKey, roomNo: '', totalCount: 0, sessions: [], isE };
+  const newBoard = { storeName, workerName, dayKey, roomName: '', totalCount: 0, sessions: [], isE };
   await saveBoard(newBoard);
   return newBoard;
 }
 
 async function saveBoard(board) {
   await db.execute(
-    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, targetRoomName, isE, totalCount, sessionsJson)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
       targetRoomName = VALUES(targetRoomName),
+      isE = VALUES(isE),
       totalCount = VALUES(totalCount),
       sessionsJson = VALUES(sessionsJson)`,
-    [board.storeName, board.workerName, board.dayKey, board.roomNo || '', board.totalCount, JSON.stringify({ sessions: board.sessions, isE: board.isE !== false })]
+    [board.storeName, board.workerName, board.dayKey, board.roomName || '', board.isE === true ? 1 : 0, board.totalCount, JSON.stringify(board.sessions || [])]
   );
 }
 
@@ -271,7 +273,7 @@ async function saveChoiceEvent(req, res) {
 
     const board = await getOrCreateBoard(payload.storeName, payload.workerName, dayKey);
     taskLog(req, 'saveChoiceEvent', '보드 조회 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
-    board.roomNo = String(payload.roomNo || board.roomNo || '').trim();
+    board.roomName = targetRoomName || board.roomName || '';
 
     const now = new Date();
     const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -330,16 +332,20 @@ async function saveChoiceEvent(req, res) {
 // =========================
 async function renderChoiceBoard(req, res) {
   const storeName = String(req.query.storeName || '').trim();
+  const targetRoomName = String(req.query.targetRoomName || '').trim();
   const workerName = String(req.query.workerName || '').trim();
   const dayKey = parseDayKey(req.query.dayKey);
 
-  if (!storeName || !workerName || !dayKey) {
-    return res.status(400).json({ ok: false, error: 'storeName/workerName/dayKey 필요' });
+  if (!storeName || !targetRoomName || !workerName || !dayKey) {
+    return res.status(400).json({ ok: false, error: 'storeName/targetRoomName/workerName/dayKey 필요' });
   }
 
   try {
-    taskLog(req, 'renderChoiceBoard', '시작', { storeName, workerName, dayKey });
+    taskLog(req, 'renderChoiceBoard', '시작', { storeName, targetRoomName, workerName, dayKey });
     const board = await getOrCreateBoard(storeName, workerName, dayKey);
+    if (board.roomName && board.roomName !== targetRoomName) {
+      return res.status(404).json({ ok: false, error: `요청 보드와 저장 보드 불일치: ${targetRoomName}` });
+    }
     taskLog(req, 'renderChoiceBoard', '성공', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true, boardText: formatBoardText(board) });
   } catch (error) {
@@ -353,38 +359,38 @@ async function renderChoiceBoard(req, res) {
 // =========================
 async function saveManualBoard(req, res) {
   const payload = req.body || {};
+  const storeName = String(payload.storeName || '').trim();
+  const workerName = String(payload.workerName || '').trim();
   const targetRoomName = String(payload.targetRoomName || '').trim();
   const dayKey = parseDayKey(payload.dayKey);
   const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
 
-  if (!targetRoomName || !dayKey || !boardLines) {
-    return res.status(400).json({ ok: false, error: 'targetRoomName/dayKey/boardLines 필요' });
+  if (!storeName || !workerName || !targetRoomName || !dayKey || !boardLines) {
+    return res.status(400).json({ ok: false, error: 'storeName/workerName/targetRoomName/dayKey/boardLines 필요' });
   }
 
   try {
     taskLog(req, 'saveManualBoard', '시작', { targetRoomName, dayKey, lines: boardLines.length });
     const [rows] = await db.execute(
-      `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
+      `SELECT storeName, workerName, dayKey, targetRoomName, isE, totalCount, sessionsJson
        FROM AUTO_TALK
-       WHERE dayKey = ?`,
-      [dayKey]
+       WHERE storeName = ? AND workerName = ? AND dayKey = ?`,
+      [storeName, workerName, dayKey]
     );
 
     let board = null;
     for (const row of rows) {
       const parsed = parseSessionsPayload(row.sessionsJson);
-      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === targetRoomName)) {
-        board = {
-          storeName: row.storeName,
-          workerName: row.workerName,
-          dayKey: row.dayKey,
-          roomNo: String(row.targetRoomName || '').trim(),
-          totalCount: Number(row.totalCount || 0),
-          sessions: parsed.sessions,
-          isE: parsed.isE
-        };
-        break;
-      }
+      board = {
+        storeName: row.storeName,
+        workerName: row.workerName,
+        dayKey: row.dayKey,
+        roomName: String(row.targetRoomName || '').trim(),
+        totalCount: Number(row.totalCount || 0),
+        sessions: parsed.sessions,
+        isE: row.isE === 1
+      };
+      break;
     }
 
     if (!board) {
@@ -412,6 +418,7 @@ async function saveManualBoard(req, res) {
       });
     }
 
+    board.roomName = targetRoomName;
     board.sessions = nextSessions;
     board.totalCount = totalCount;
     board.isE = payload.isE === true;

@@ -66,7 +66,7 @@ exports.addWorker = async (req, res) => {
   try {
     const isForbidden = await isBanned(Number(storeNo), workerName);
     if (isForbidden) {
-      console.log(`[INFO] 금칙어 감지 - 무시됨: ${storeNo}-${workerName}`);
+      //console.log(`[INFO] 금칙어 감지 - 무시됨: ${storeNo}-${workerName}`);
       return res.status(200).json({ message: '금칙어가 포함된 이름이라 저장되지 않았습니다.' });
     }
     

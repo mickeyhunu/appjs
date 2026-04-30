@@ -118,17 +118,17 @@ function findRoomAndManager(text) {
 
 async function saveManualBoard(req, res) {
   const payload = req.body || {};
-  const roomName = String(payload.roomName || '').trim();
+  const tartgetRoomName = String(payload.targetRoomName || '').trim();
   const dayKey = parseDayKey(payload.dayKey);
   const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
 
-  if (!roomName || !dayKey || !boardLines) {
-    return res.status(400).json({ ok: false, error: 'roomName/dayKey/boardLines 필요' });
+  if (!tartgetRoomName || !dayKey || !boardLines) {
+    return res.status(400).json({ ok: false, error: 'tartgetRoomName/dayKey/boardLines 필요' });
   }
 
   try {
     const [rows] = await db.execute(
-      `SELECT storeName, workerName, dayKey, roomName, totalCount, sessionsJson
+      `SELECT storeName, workerName, dayKey, tartgetRoomName, totalCount, sessionsJson
        FROM AUTO_TALK
        WHERE dayKey = ?`,
       [dayKey]
@@ -137,12 +137,12 @@ async function saveManualBoard(req, res) {
     let board = null;
     for (const row of rows) {
       const parsed = parseSessionsPayload(row.sessionsJson);
-      if (parsed.sessions.some((s) => String(s.roomName || '').trim() === roomName)) {
+      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === tartgetRoomName)) {
         board = {
           storeName: row.storeName,
           workerName: row.workerName,
           dayKey: row.dayKey,
-          roomNo: String(row.roomName || '').trim(),
+          roomNo: String(row.targetRoomName || '').trim(),
           totalCount: Number(row.totalCount || 0),
           sessions: parsed.sessions,
           isE: parsed.isE
@@ -152,7 +152,7 @@ async function saveManualBoard(req, res) {
     }
 
     if (!board) {
-      return res.status(404).json({ ok: false, error: `연결된 보드 없음: roomName=${roomName}` });
+      return res.status(404).json({ ok: false, error: `연결된 보드 없음: targetRoomName=${tartgetRoomName}` });
     }
 
     const nextSessions = [];
@@ -167,7 +167,7 @@ async function saveManualBoard(req, res) {
       nextSessions.push({
         roomNo: parsed.roomNo,
         managerName: parsed.managerName,
-        roomName,
+        targetRoomName: tartgetRoomName,
         isJm: text.includes('ㅈㅁ'),
         rawMessage: '[manual]',
         startAt: '',
@@ -189,7 +189,7 @@ async function saveManualBoard(req, res) {
 async function getOrCreateBoard(storeName, workerName, dayKey) {
   // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
-    `SELECT storeName, workerName, dayKey, roomName, totalCount, sessionsJson
+    `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
      FROM AUTO_TALK
      WHERE storeName = ? AND workerName = ? AND dayKey = ?`,
     [storeName, workerName, dayKey]
@@ -201,7 +201,7 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
       storeName: row.storeName,
       workerName: row.workerName,
       dayKey: row.dayKey,
-      roomNo: String(row.roomName || '').trim(),
+      roomNo: String(row.targetRoomName || '').trim(),
       totalCount: Number(row.totalCount || 0),
       ...parseSessionsPayload(row.sessionsJson)
     };
@@ -216,10 +216,10 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
 
 async function saveBoard(board) {
   await db.execute(
-    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, roomName, totalCount, sessionsJson)
+    `INSERT INTO AUTO_TALK (storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson)
      VALUES (?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-      roomName = VALUES(roomName),
+      targetRoomName = VALUES(targetRoomName),
       totalCount = VALUES(totalCount),
       sessionsJson = VALUES(sessionsJson)`,
     [board.storeName, board.workerName, board.dayKey, board.roomNo || '', board.totalCount, JSON.stringify({ sessions: board.sessions, isE: board.isE !== false })]
@@ -328,7 +328,7 @@ async function saveChoiceEvent(req, res) {
       board.sessions.push({
         roomNo: payload.roomNo,
         managerName: roomManagerName,
-        roomName: targetRoomName,
+        targetRoomName: targetRoomName,
         isJm: payload.isJm === true,
         rawMessage: String(payload.rawMessage || ''),
         startAt,
@@ -343,7 +343,7 @@ async function saveChoiceEvent(req, res) {
       if (lastOpen) {
         lastOpen.roomNo = payload.roomNo;
         lastOpen.managerName = roomManagerName;
-        lastOpen.roomName = targetRoomName;
+        lastOpen.targetRoomName = targetRoomName;
         lastOpen.isJm = payload.isJm === true;
         lastOpen.rawMessage = String(payload.rawMessage || '');
         lastOpen.endCount = payload.endCount || '';
@@ -352,7 +352,7 @@ async function saveChoiceEvent(req, res) {
         board.sessions.push({
           roomNo: payload.roomNo,
           managerName: roomManagerName,
-          roomName: targetRoomName,
+          targetRoomName: targetRoomName,
           isJm: payload.isJm === true,
           rawMessage: String(payload.rawMessage || ''),
           startAt: '',

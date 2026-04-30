@@ -262,14 +262,14 @@ function formatBoardText(board) {
 
 async function saveChoiceEvent(req, res) {
   const payload = req.body || {};
-  const managerName = String(payload.roomManagerName || payload.managerName || '').trim();
-  const roomName = String(payload.roomName || '').trim();
+  const roomManagerName = String(payload.roomManagerName || '').trim();
+  const targetRoomName = String(payload.targetRoomName || '').trim();
 
-  const eventType = String(payload.eventType || payload.status || '').trim().toUpperCase();
+  const eventType = String(payload.eventType || '').trim().toUpperCase();
 
   const required = ['storeName', 'workerName', 'roomNo', 'dayKey'];
   const missing = required.filter((field) => !String(payload[field] || '').trim());
-  if (!managerName) missing.push('roomManagerName');
+  if (!roomManagerName) missing.push('roomManagerName');
 
   if (missing.length) {
     return res.status(400).json({ ok: false, error: `필수값 누락: ${missing.join(', ')}` });
@@ -290,8 +290,8 @@ async function saveChoiceEvent(req, res) {
     if (eventType === 'START') {
       board.sessions.push({
         roomNo: payload.roomNo,
-        managerName,
-        roomName,
+        managerName: roomManagerName,
+        roomName: targetRoomName,
         isJm: payload.isJm === true,
         rawMessage: String(payload.rawMessage || ''),
         startAt,
@@ -305,8 +305,8 @@ async function saveChoiceEvent(req, res) {
       const lastOpen = [...board.sessions].reverse().find((s) => s.status === 'START' && s.roomNo === payload.roomNo);
       if (lastOpen) {
         lastOpen.roomNo = payload.roomNo;
-        lastOpen.managerName = managerName;
-        lastOpen.roomName = roomName;
+        lastOpen.managerName = roomManagerName;
+        lastOpen.roomName = targetRoomName;
         lastOpen.isJm = payload.isJm === true;
         lastOpen.rawMessage = String(payload.rawMessage || '');
         lastOpen.endCount = payload.endCount || '';
@@ -314,8 +314,8 @@ async function saveChoiceEvent(req, res) {
       } else {
         board.sessions.push({
           roomNo: payload.roomNo,
-          managerName,
-          roomName,
+          managerName: roomManagerName,
+          roomName: targetRoomName,
           isJm: payload.isJm === true,
           rawMessage: String(payload.rawMessage || ''),
           startAt: '',

@@ -7,6 +7,72 @@ function normalizeCountText(value) {
   return m ? Number(m[1]) : 0;
 }
 
+
+
+function extractLineCount(line) {
+  if (!line) return null;
+  const m = String(line).match(/(\d+)(?:\.(\d))?\s*ㄲ/);
+  if (!m) return null;
+
+  const intPart = Number.parseInt(m[1], 10);
+  let decPart = m[2] ? Number.parseInt(m[2], 10) : 0;
+  if (!Number.isFinite(intPart) || !Number.isFinite(decPart)) return null;
+
+  if (String(line).includes('ㅈㅁ')) {
+    decPart += intPart;
+  }
+
+  return { intPart, decPart };
+}
+
+function calcTotalValue(board) {
+  let intSum = 0;
+  let decSum = 0;
+  let found = false;
+
+  for (const session of board.sessions || []) {
+    const parsed = extractLineCount(session.endCount);
+    if (!parsed) continue;
+    intSum += parsed.intPart;
+    decSum += parsed.decPart;
+    found = true;
+  }
+
+  if (!found) return null;
+  return { intSum, decSum };
+}
+
+function formatTotalParts(parts) {
+  if (!parts) return '';
+  if (parts.decSum === 0) return String(parts.intSum);
+  return `${parts.intSum}.${parts.decSum}`;
+}
+
+function isEBoard(board) {
+  return true;
+}
+
+function getEPrefix(board) {
+  return isEBoard(board) ? 'E' : '';
+}
+
+function calcTotal(board) {
+  const totalValue = calcTotalValue(board);
+  if (totalValue !== null) {
+    return `${getEPrefix(board)}${formatTotalParts(totalValue)}개`;
+  }
+  return `${getEPrefix(board)}${board.totalCount}개`;
+}
+
+function calcAmount(board) {
+  const parts = calcTotalValue(board);
+  if (parts === null) return `${Math.round(board.totalCount * 9.9)}만원`;
+
+  const tc = isEBoard(board) ? 10 : 9;
+  const amount = (parts.intSum * tc) + parts.decSum - 1;
+  return amount < 0 ? '0만원' : `${amount}만원`;
+}
+
 function parseDayKey(dayKey) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || ''))) {
     return null;
@@ -109,8 +175,8 @@ function formatBoardText(board) {
     '➖➖➖➖➖➖➖➖➖➖➖',
     detail,
     '➖➖➖➖➖➖➖➖➖➖➖',
-    `총 갯수 ㅡ E${board.totalCount}개`,
-    `총 금액 ㅡ ${Math.round(board.totalCount * 9.9)}만원`
+    `총 갯수 ㅡ ${calcTotal(board)}`,
+    `총 금액 ㅡ ${calcAmount(board)}`
   ].join('\n');
 }
 

@@ -9,43 +9,31 @@ function normalizeCountText(value) {
 
 
 
-function extractLineCount(line) {
-  if (!line) return null;
-  const m = String(line).match(/(\d+)(?:\.(\d))?\s*ㄲ/);
-  if (!m) return null;
-
-  const intPart = Number.parseInt(m[1], 10);
-  let decPart = m[2] ? Number.parseInt(m[2], 10) : 0;
-  if (!Number.isFinite(intPart) || !Number.isFinite(decPart)) return null;
-
-  if (String(line).includes('ㅈㅁ')) {
-    decPart += intPart;
-  }
-
-  return { intPart, decPart };
+function extractLineCount(line, isJm) {
+  const baseCount = normalizeCountText(line);
+  if (!Number.isFinite(baseCount) || baseCount <= 0) return null;
+  const jmBonus = isJm || String(line || '').includes('ㅈㅁ') ? 0.1 : 0;
+  return baseCount + jmBonus;
 }
 
 function calcTotalValue(board) {
-  let intSum = 0;
-  let decSum = 0;
+  let total = 0;
   let found = false;
 
   for (const session of board.sessions || []) {
-    const parsed = extractLineCount(session.endCount);
-    if (!parsed) continue;
-    intSum += parsed.intPart;
-    decSum += parsed.decPart;
+    const parsed = extractLineCount(session.endCount, session.isJm === true);
+    if (parsed === null) continue;
+    total += parsed;
     found = true;
   }
 
   if (!found) return null;
-  return { intSum, decSum };
+  return total;
 }
 
-function formatTotalParts(parts) {
-  if (!parts) return '';
-  if (parts.decSum === 0) return String(parts.intSum);
-  return `${parts.intSum}.${parts.decSum}`;
+function formatTotalParts(total) {
+  if (total === null || total === undefined) return '';
+  return Number.isInteger(total) ? String(total) : total.toFixed(1);
 }
 
 function isEBoard(board) {
@@ -69,7 +57,7 @@ function calcAmount(board) {
   if (parts === null) return `${Math.round(board.totalCount * 9.9)}만원`;
 
   const tc = isEBoard(board) ? 10 : 9;
-  const amount = (parts.intSum * tc) + parts.decSum - 1;
+  const amount = (Math.floor(parts) * tc) + Math.round((parts % 1) * 10) - 1;
   return amount < 0 ? '0만원' : `${amount}만원`;
 }
 
@@ -94,7 +82,7 @@ function parseSessionsPayload(raw) {
 }
 
 function findRoomAndManager(text) {
-  const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+([\d.]+ㄲ)$/);
+  const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+([\d.]+ㄲ)(?:\s+ㅈㅁ)?$/);
   if (!m) return null;
   return { roomNo: m[1], managerName: m[2], endCount: m[3] };
 }
@@ -253,7 +241,8 @@ function formatBoardText(board) {
     if (session.status === 'START') {
       return `${no} ${session.roomNo}T ${session.managerName} ${session.startAt}`;
     }
-    return `${no} ${session.roomNo}T ${session.managerName} ${session.endCount}`;
+    const jmSuffix = session.isJm === true ? ' ㅈㅁ' : '';
+    return `${no} ${session.roomNo}T ${session.managerName} ${session.endCount}${jmSuffix}`;
   });
 
   const latestOpen = [...board.sessions].reverse().find((s) => s.status === 'START') || null;

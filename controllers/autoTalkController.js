@@ -273,7 +273,9 @@ async function saveChoiceEvent(req, res) {
   const managerName = String(payload.roomManagerName || payload.managerName || '').trim();
   const roomName = String(payload.roomName || '').trim();
 
-  const required = ['storeName', 'workerName', 'roomNo', 'eventType', 'dayKey'];
+  const eventType = String(payload.eventType || payload.status || '').trim().toUpperCase();
+
+  const required = ['storeName', 'workerName', 'roomNo', 'dayKey'];
   const missing = required.filter((field) => !String(payload[field] || '').trim());
   if (!managerName) missing.push('roomManagerName');
 
@@ -292,7 +294,7 @@ async function saveChoiceEvent(req, res) {
     const now = new Date();
     const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    if (payload.eventType === 'START') {
+    if (eventType === 'START') {
       board.sessions.push({
         roomNo: payload.roomNo,
         managerName,
@@ -303,14 +305,19 @@ async function saveChoiceEvent(req, res) {
         endCount: '',
         status: 'START'
       });
-    } else if (payload.eventType === 'END') {
+    } else if (eventType === 'END') {
       const countValue = normalizeCountText(payload.endCount);
       board.totalCount += countValue;
 
       const lastOpen = [...board.sessions].reverse().find((s) => s.status === 'START' && s.roomNo === payload.roomNo);
       if (lastOpen) {
-        lastOpen.status = 'END';
+        lastOpen.roomNo = payload.roomNo;
+        lastOpen.managerName = managerName;
+        lastOpen.roomName = roomName;
+        lastOpen.isJm = payload.isJm === true;
+        lastOpen.rawMessage = String(payload.rawMessage || '');
         lastOpen.endCount = payload.endCount || '';
+        lastOpen.status = 'END';
       } else {
         board.sessions.push({
           roomNo: payload.roomNo,
@@ -324,7 +331,7 @@ async function saveChoiceEvent(req, res) {
         });
       }
     } else {
-      return res.status(400).json({ ok: false, error: `지원하지 않는 eventType: ${payload.eventType}` });
+      return res.status(400).json({ ok: false, error: `지원하지 않는 eventType: ${eventType}` });
     }
 
     await saveBoard(board);

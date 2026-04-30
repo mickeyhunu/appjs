@@ -14,6 +14,17 @@ function isValidJobId(value) {
   return Number.isInteger(num) && num > 0;
 }
 
+
+function normalizeDateTime(value) {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) return null;
+
+  const parsed = new Date(text.replace(' ', 'T'));
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return text;
+}
+
 exports.getDueJobs = async (req, res) => {
   let conn;
   try {
@@ -58,11 +69,12 @@ exports.turnOnAutoSend = async (req, res) => {
   const storeNo = toPositiveInt(req.body.storeNo);
   const targetRoomName = String(req.body.targetRoomName || '').trim();
   const intervalMinutes = toPositiveInt(req.body.intervalMinutes);
+  const nextSendAt = normalizeDateTime(req.body.nextSendAt);
 
-  if (!storeNo || !targetRoomName || !intervalMinutes) {
+  if (!storeNo || !targetRoomName || !intervalMinutes || !nextSendAt) {
     return res.status(400).json({
       success: false,
-      error: 'storeNo, targetRoomName, intervalMinutes는 필수이며 1 이상의 값이어야 합니다.',
+      error: 'storeNo, targetRoomName, intervalMinutes, nextSendAt은 필수입니다. nextSendAt 형식은 YYYY-MM-DD HH:mm:ss 입니다.',
     });
   }
 
@@ -70,15 +82,15 @@ exports.turnOnAutoSend = async (req, res) => {
     const [result] = await db.execute(
       `INSERT INTO AUTO_SEND_TEAMTALK
         (storeNo, targetRoomName, intervalMinutes, nextSendAt, lastSentAt, status, isRunning, lastError)
-       VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL, ?, 0, NULL)
+       VALUES (?, ?, ?, STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), NULL, ?, 0, NULL)
        ON DUPLICATE KEY UPDATE
          storeNo = VALUES(storeNo),
          intervalMinutes = VALUES(intervalMinutes),
-         nextSendAt = DATE_ADD(NOW(), INTERVAL VALUES(intervalMinutes) MINUTE),
+         nextSendAt = VALUES(nextSendAt),
          status = ?,
          isRunning = 0,
          lastError = NULL`,
-      [storeNo, targetRoomName, intervalMinutes, intervalMinutes, STATUS_RUNNING, STATUS_RUNNING]
+      [storeNo, targetRoomName, intervalMinutes, nextSendAt, STATUS_RUNNING, STATUS_RUNNING]
     );
 
     res.json({ success: true, data: { affectedRows: result.affectedRows } });
@@ -116,9 +128,10 @@ exports.turnOffAutoSend = async (req, res) => {
 
 exports.markJobDone = async (req, res) => {
   const jobId = req.body.jobId;
+  const nextSendAt = normalizeDateTime(req.body.nextSendAt);
 
-  if (!isValidJobId(jobId)) {
-    return res.status(400).json({ success: false, error: '유효한 jobId가 필요합니다.' });
+  if (!isValidJobId(jobId) || !nextSendAt) {
+    return res.status(400).json({ success: false, error: '유효한 jobId와 nextSendAt(YYYY-MM-DD HH:mm:ss)이 필요합니다.' });
   }
 
   try {
@@ -126,10 +139,10 @@ exports.markJobDone = async (req, res) => {
       `UPDATE AUTO_SEND_TEAMTALK
        SET isRunning = 0,
            lastSentAt = NOW(),
-           nextSendAt = DATE_ADD(NOW(), INTERVAL intervalMinutes MINUTE),
+           nextSendAt = STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'),
            lastError = NULL
        WHERE jobId = ?`,
-      [jobId]
+      [nextSendAt, jobId]
     );
 
     if (result.affectedRows === 0) {

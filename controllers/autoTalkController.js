@@ -118,17 +118,17 @@ function findRoomAndManager(text) {
 
 async function saveManualBoard(req, res) {
   const payload = req.body || {};
-  const tartgetRoomName = String(payload.targetRoomName || '').trim();
+  const targetRoomName = String(payload.targetRoomName || '').trim();
   const dayKey = parseDayKey(payload.dayKey);
   const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
 
-  if (!tartgetRoomName || !dayKey || !boardLines) {
-    return res.status(400).json({ ok: false, error: 'tartgetRoomName/dayKey/boardLines 필요' });
+  if (!targetRoomName || !dayKey || !boardLines) {
+    return res.status(400).json({ ok: false, error: 'targetRoomName/dayKey/boardLines 필요' });
   }
 
   try {
     const [rows] = await db.execute(
-      `SELECT storeName, workerName, dayKey, tartgetRoomName, totalCount, sessionsJson
+      `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
        FROM AUTO_TALK
        WHERE dayKey = ?`,
       [dayKey]
@@ -137,7 +137,7 @@ async function saveManualBoard(req, res) {
     let board = null;
     for (const row of rows) {
       const parsed = parseSessionsPayload(row.sessionsJson);
-      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === tartgetRoomName)) {
+      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === targetRoomName)) {
         board = {
           storeName: row.storeName,
           workerName: row.workerName,
@@ -152,7 +152,7 @@ async function saveManualBoard(req, res) {
     }
 
     if (!board) {
-      return res.status(404).json({ ok: false, error: `연결된 보드 없음: targetRoomName=${tartgetRoomName}` });
+      return res.status(404).json({ ok: false, error: `연결된 보드 없음: targetRoomName=${targetRoomName}` });
     }
 
     const nextSessions = [];
@@ -167,7 +167,7 @@ async function saveManualBoard(req, res) {
       nextSessions.push({
         roomNo: parsed.roomNo,
         managerName: parsed.managerName,
-        targetRoomName: tartgetRoomName,
+        targetRoomName: targetRoomName,
         isJm: text.includes('ㅈㅁ'),
         rawMessage: '[manual]',
         startAt: '',

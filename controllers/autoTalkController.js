@@ -117,7 +117,7 @@ async function resolveIsEForBoard(storeName, workerName, dayKey) {
 function findRoomAndManager(text) {
   const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+([\d.]+ㄲ)(?:\s+ㅈㅁ)?$/);
   if (!m) return null;
-  return { roomNo: m[1], managerName: m[2], endCount: m[3] };
+  return { roomNo: m[1], roomManagerName: m[2], endCount: m[3] };
 }
 
 async function saveManualBoard(req, res) {
@@ -170,7 +170,7 @@ async function saveManualBoard(req, res) {
       totalCount += normalizeCountText(parsed.endCount);
       nextSessions.push({
         roomNo: parsed.roomNo,
-        managerName: parsed.managerName,
+        roomManagerName: parsed.roomManagerName,
         targetRoomName: targetRoomName,
         isJm: text.includes('ㅈㅁ'),
         rawMessage: '[manual]',
@@ -182,7 +182,7 @@ async function saveManualBoard(req, res) {
 
     board.sessions = nextSessions;
     board.totalCount = totalCount;
-    board.isE = payload.isE !== false;
+    board.isE = payload.isE === true;
 
     await saveBoard(board);
     return res.json({ ok: true });
@@ -258,7 +258,7 @@ function formatMinute(time) {
 function buildLatestDetail(latestOpen) {
   const match = String(latestOpen.startAt || '').match(/^(\d{1,2}):(\d{1,2})$/);
   if (!match) {
-    return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}`;
+    return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.roomManagerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}`;
   }
 
   const hours = Number(match[1]);
@@ -268,17 +268,17 @@ function buildLatestDetail(latestOpen) {
   const fullTeaTime = calculateTime(hours, minutes, 31);
   const finishTime = calculateTime(hours, minutes, 60);
 
-  return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${formatTime(startTime)}\n⏰ 반 티 ➜ ${formatMinute(halfTeaTime)}분\n⏰ 완 티 ➜ ${formatMinute(fullTeaTime)}분\n🏁 만 시 ➜ ${formatMinute(finishTime)}분`;
+  return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.roomManagerName}\n⏰ 스타트 ➜ ${formatTime(startTime)}\n⏰ 반 티 ➜ ${formatMinute(halfTeaTime)}분\n⏰ 완 티 ➜ ${formatMinute(fullTeaTime)}분\n🏁 만 시 ➜ ${formatMinute(finishTime)}분`;
 }
 
 function formatBoardText(board) {
   const rows = board.sessions.map((session, i) => {
     const no = `${i + 1}️⃣`;
     if (session.status === 'START') {
-      return `${no} ${session.roomNo}T ${session.managerName} ${session.startAt}`;
+      return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.startAt}`;
     }
     const jmSuffix = session.isJm === true ? ' ㅈㅁ' : '';
-    return `${no} ${session.roomNo}T ${session.managerName} ${session.endCount}${jmSuffix}`;
+    return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.endCount}${jmSuffix}`;
   });
 
   const latestOpen = [...board.sessions].reverse().find((s) => s.status === 'START') || null;
@@ -331,7 +331,7 @@ async function saveChoiceEvent(req, res) {
     if (eventType === 'START') {
       board.sessions.push({
         roomNo: payload.roomNo,
-        managerName: roomManagerName,
+        roomManagerName: roomManagerName,
         targetRoomName: targetRoomName,
         isJm: payload.isJm === true,
         rawMessage: String(payload.rawMessage || ''),
@@ -346,7 +346,7 @@ async function saveChoiceEvent(req, res) {
       const lastOpen = [...board.sessions].reverse().find((s) => s.status === 'START' && s.roomNo === payload.roomNo);
       if (lastOpen) {
         lastOpen.roomNo = payload.roomNo;
-        lastOpen.managerName = roomManagerName;
+        lastOpen.roomManagerName = roomManagerName;
         lastOpen.targetRoomName = targetRoomName;
         lastOpen.isJm = payload.isJm === true;
         lastOpen.rawMessage = String(payload.rawMessage || '');
@@ -355,7 +355,7 @@ async function saveChoiceEvent(req, res) {
       } else {
         board.sessions.push({
           roomNo: payload.roomNo,
-          managerName: roomManagerName,
+          roomManagerName: roomManagerName,
           targetRoomName: targetRoomName,
           isJm: payload.isJm === true,
           rawMessage: String(payload.rawMessage || ''),

@@ -49,7 +49,7 @@ function formatTotalParts(parts) {
 }
 
 function isEBoard(board) {
-  return true;
+  return board.isE !== false;
 }
 
 function getEPrefix(board) {
@@ -80,6 +80,94 @@ function parseDayKey(dayKey) {
   return dayKey;
 }
 
+
+function parseSessionsPayload(raw) {
+  const parsed = JSON.parse(raw || '[]');
+  if (Array.isArray(parsed)) {
+    return { sessions: parsed, isE: true };
+  }
+
+  return {
+    sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+    isE: parsed.isE !== false
+  };
+}
+
+function findRoomAndManager(text) {
+  const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+([\d.]+ㄲ)$/);
+  if (!m) return null;
+  return { roomNo: m[1], managerName: m[2], endCount: m[3] };
+}
+
+async function saveManualBoard(req, res) {
+  const payload = req.body || {};
+  const roomName = String(payload.roomName || '').trim();
+  const dayKey = parseDayKey(payload.dayKey);
+  const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
+
+  if (!roomName || !dayKey || !boardLines) {
+    return res.status(400).json({ ok: false, error: 'roomName/dayKey/boardLines 필요' });
+  }
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT storeName, workerName, dayKey, totalCount, sessionsJson
+       FROM AUTO_TALK
+       WHERE dayKey = ?`,
+      [dayKey]
+    );
+
+    let board = null;
+    for (const row of rows) {
+      const parsed = parseSessionsPayload(row.sessionsJson);
+      if (parsed.sessions.some((s) => String(s.roomName || '').trim() === roomName)) {
+        board = {
+          storeName: row.storeName,
+          workerName: row.workerName,
+          dayKey: row.dayKey,
+          totalCount: Number(row.totalCount || 0),
+          sessions: parsed.sessions,
+          isE: parsed.isE
+        };
+        break;
+      }
+    }
+
+    if (!board) {
+      return res.status(404).json({ ok: false, error: `연결된 보드 없음: roomName=${roomName}` });
+    }
+
+    const nextSessions = [];
+    let totalCount = 0;
+
+    for (const line of boardLines) {
+      const text = String((line && line.text) || '').trim();
+      const parsed = findRoomAndManager(text);
+      if (!parsed) continue;
+
+      totalCount += normalizeCountText(parsed.endCount);
+      nextSessions.push({
+        roomNo: parsed.roomNo,
+        managerName: parsed.managerName,
+        roomName,
+        isJm: text.includes('ㅈㅁ'),
+        rawMessage: '[manual]',
+        startAt: '',
+        endCount: parsed.endCount,
+        status: 'END'
+      });
+    }
+
+    board.sessions = nextSessions;
+    board.totalCount = totalCount;
+    board.isE = payload.isE !== false;
+
+    await saveBoard(board);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+}
 async function getOrCreateBoard(storeName, workerName, dayKey) {
   const [rows] = await db.execute(
     `SELECT storeName, workerName, dayKey, totalCount, sessionsJson
@@ -95,11 +183,11 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
       workerName: row.workerName,
       dayKey: row.dayKey,
       totalCount: Number(row.totalCount || 0),
-      sessions: JSON.parse(row.sessionsJson || '[]')
+      ...parseSessionsPayload(row.sessionsJson)
     };
   }
 
-  const newBoard = { storeName, workerName, dayKey, totalCount: 0, sessions: [] };
+  const newBoard = { storeName, workerName, dayKey, totalCount: 0, sessions: [], isE: true };
   await saveBoard(newBoard);
   return newBoard;
 }
@@ -111,7 +199,7 @@ async function saveBoard(board) {
      ON DUPLICATE KEY UPDATE
       totalCount = VALUES(totalCount),
       sessionsJson = VALUES(sessionsJson)`,
-    [board.storeName, board.workerName, board.dayKey, board.totalCount, JSON.stringify(board.sessions)]
+    [board.storeName, board.workerName, board.dayKey, board.totalCount, JSON.stringify({ sessions: board.sessions, isE: board.isE !== false })]
   );
 }
 
@@ -265,5 +353,6 @@ async function renderChoiceBoard(req, res) {
 
 module.exports = {
   saveChoiceEvent,
-  renderChoiceBoard
+  renderChoiceBoard,
+  saveManualBoard
 };

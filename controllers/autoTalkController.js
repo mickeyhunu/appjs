@@ -143,7 +143,7 @@ async function saveChoiceEvent(req, res) {
     }
 
     await saveBoard(board);
-    return res.json({ ok: true });
+    return res.json({ ok: true, boardText: formatBoardText(board) });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }

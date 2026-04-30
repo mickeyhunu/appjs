@@ -119,77 +119,6 @@ function findRoomAndManager(text) {
   if (!m) return null;
   return { roomNo: m[1], roomManagerName: m[2], endCount: m[3] };
 }
-
-async function saveManualBoard(req, res) {
-  const payload = req.body || {};
-  const targetRoomName = String(payload.targetRoomName || '').trim();
-  const dayKey = parseDayKey(payload.dayKey);
-  const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
-
-  if (!targetRoomName || !dayKey || !boardLines) {
-    return res.status(400).json({ ok: false, error: 'targetRoomName/dayKey/boardLines 필요' });
-  }
-
-  try {
-    const [rows] = await db.execute(
-      `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
-       FROM AUTO_TALK
-       WHERE dayKey = ?`,
-      [dayKey]
-    );
-
-    let board = null;
-    for (const row of rows) {
-      const parsed = parseSessionsPayload(row.sessionsJson);
-      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === targetRoomName)) {
-        board = {
-          storeName: row.storeName,
-          workerName: row.workerName,
-          dayKey: row.dayKey,
-          roomNo: String(row.targetRoomName || '').trim(),
-          totalCount: Number(row.totalCount || 0),
-          sessions: parsed.sessions,
-          isE: parsed.isE
-        };
-        break;
-      }
-    }
-
-    if (!board) {
-      return res.status(404).json({ ok: false, error: `연결된 보드 없음: targetRoomName=${targetRoomName}` });
-    }
-
-    const nextSessions = [];
-    let totalCount = 0;
-
-    for (const line of boardLines) {
-      const text = String((line && line.text) || '').trim();
-      const parsed = findRoomAndManager(text);
-      if (!parsed) continue;
-
-      totalCount += normalizeCountText(parsed.endCount);
-      nextSessions.push({
-        roomNo: parsed.roomNo,
-        roomManagerName: parsed.roomManagerName,
-        targetRoomName: targetRoomName,
-        isJm: text.includes('ㅈㅁ'),
-        rawMessage: '[manual]',
-        startAt: '',
-        endCount: parsed.endCount,
-        status: 'END'
-      });
-    }
-
-    board.sessions = nextSessions;
-    board.totalCount = totalCount;
-    board.isE = payload.isE === true;
-
-    await saveBoard(board);
-    return res.json({ ok: true });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-}
 async function getOrCreateBoard(storeName, workerName, dayKey) {
   // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
@@ -296,6 +225,9 @@ function formatBoardText(board) {
   ].join('\n');
 }
 
+// =========================
+// API 1) saveChoiceEvent
+// =========================
 async function saveChoiceEvent(req, res) {
   // [흐름 요약]
   // 1) 요청값 검증
@@ -375,6 +307,9 @@ async function saveChoiceEvent(req, res) {
   }
 }
 
+// =========================
+// API 2) renderChoiceBoard
+// =========================
 async function renderChoiceBoard(req, res) {
   const storeName = String(req.query.storeName || '').trim();
   const workerName = String(req.query.workerName || '').trim();
@@ -387,6 +322,80 @@ async function renderChoiceBoard(req, res) {
   try {
     const board = await getOrCreateBoard(storeName, workerName, dayKey);
     return res.json({ ok: true, boardText: formatBoardText(board) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+}
+
+// =========================
+// API 3) saveManualBoard
+// =========================
+async function saveManualBoard(req, res) {
+  const payload = req.body || {};
+  const targetRoomName = String(payload.targetRoomName || '').trim();
+  const dayKey = parseDayKey(payload.dayKey);
+  const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
+
+  if (!targetRoomName || !dayKey || !boardLines) {
+    return res.status(400).json({ ok: false, error: 'targetRoomName/dayKey/boardLines 필요' });
+  }
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
+       FROM AUTO_TALK
+       WHERE dayKey = ?`,
+      [dayKey]
+    );
+
+    let board = null;
+    for (const row of rows) {
+      const parsed = parseSessionsPayload(row.sessionsJson);
+      if (parsed.sessions.some((s) => String(s.targetRoomName || '').trim() === targetRoomName)) {
+        board = {
+          storeName: row.storeName,
+          workerName: row.workerName,
+          dayKey: row.dayKey,
+          roomNo: String(row.targetRoomName || '').trim(),
+          totalCount: Number(row.totalCount || 0),
+          sessions: parsed.sessions,
+          isE: parsed.isE
+        };
+        break;
+      }
+    }
+
+    if (!board) {
+      return res.status(404).json({ ok: false, error: `연결된 보드 없음: targetRoomName=${targetRoomName}` });
+    }
+
+    const nextSessions = [];
+    let totalCount = 0;
+
+    for (const line of boardLines) {
+      const text = String((line && line.text) || '').trim();
+      const parsed = findRoomAndManager(text);
+      if (!parsed) continue;
+
+      totalCount += normalizeCountText(parsed.endCount);
+      nextSessions.push({
+        roomNo: parsed.roomNo,
+        roomManagerName: parsed.roomManagerName,
+        targetRoomName: targetRoomName,
+        isJm: text.includes('ㅈㅁ'),
+        rawMessage: '[manual]',
+        startAt: '',
+        endCount: parsed.endCount,
+        status: 'END'
+      });
+    }
+
+    board.sessions = nextSessions;
+    board.totalCount = totalCount;
+    board.isE = payload.isE === true;
+
+    await saveBoard(board);
+    return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }

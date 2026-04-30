@@ -1,5 +1,14 @@
 const db = require('../config/db');
 
+function taskLog(req, taskName, message, extra) {
+  const requestId = `${new Date().toISOString()}`;
+  if (extra !== undefined) {
+    console.log(`[작업로그][${requestId}][${taskName}] ${message}`, extra);
+    return;
+  }
+  console.log(`[작업로그][${requestId}][${taskName}] ${message}`);
+}
+
 // 한글 요일 표기용 상수(보드 헤더 생성 시 사용)
 const KOREAN_WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
@@ -252,7 +261,16 @@ async function saveChoiceEvent(req, res) {
   }
 
   try {
+    taskLog(req, 'saveChoiceEvent', '시작', {
+      storeName: payload.storeName,
+      workerName: payload.workerName,
+      roomNo: payload.roomNo,
+      eventType,
+      dayKey
+    });
+
     const board = await getOrCreateBoard(payload.storeName, payload.workerName, dayKey);
+    taskLog(req, 'saveChoiceEvent', '보드 조회 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     board.roomNo = String(payload.roomNo || board.roomNo || '').trim();
 
     const now = new Date();
@@ -299,8 +317,10 @@ async function saveChoiceEvent(req, res) {
     }
 
     await saveBoard(board);
+    taskLog(req, 'saveChoiceEvent', '보드 저장 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true });
   } catch (error) {
+    taskLog(req, 'saveChoiceEvent', '실패', { error: error.message });
     return res.status(500).json({ ok: false, error: error.message });
   }
 }
@@ -318,9 +338,12 @@ async function renderChoiceBoard(req, res) {
   }
 
   try {
+    taskLog(req, 'renderChoiceBoard', '시작', { storeName, workerName, dayKey });
     const board = await getOrCreateBoard(storeName, workerName, dayKey);
+    taskLog(req, 'renderChoiceBoard', '성공', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true, boardText: formatBoardText(board) });
   } catch (error) {
+    taskLog(req, 'renderChoiceBoard', '실패', { error: error.message });
     return res.status(500).json({ ok: false, error: error.message });
   }
 }
@@ -339,6 +362,7 @@ async function saveManualBoard(req, res) {
   }
 
   try {
+    taskLog(req, 'saveManualBoard', '시작', { targetRoomName, dayKey, lines: boardLines.length });
     const [rows] = await db.execute(
       `SELECT storeName, workerName, dayKey, targetRoomName, totalCount, sessionsJson
        FROM AUTO_TALK
@@ -393,8 +417,10 @@ async function saveManualBoard(req, res) {
     board.isE = payload.isE === true;
 
     await saveBoard(board);
+    taskLog(req, 'saveManualBoard', '보드 저장 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true });
   } catch (error) {
+    taskLog(req, 'saveManualBoard', '실패', { error: error.message });
     return res.status(500).json({ ok: false, error: error.message });
   }
 }

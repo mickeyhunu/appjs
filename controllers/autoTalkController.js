@@ -234,17 +234,17 @@ function formatMinute(time) {
 function buildLatestDetail(latestOpen) {
   const match = String(latestOpen.startAt || '').match(/^(\d{1,2}):(\d{1,2})$/);
   if (!match) {
-    return `\n🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}\n`;
+    return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}`;
   }
 
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
   const startTime = calculateTime(hours, minutes, 0);
-  const halfTeaTime = calculateTime(hours, minutes, 32);
-  const fullTeaTime = calculateTime(hours, minutes, 52);
-  const finishTime = calculateTime(hours, minutes, 81);
+  const halfTeaTime = calculateTime(hours, minutes, 11);
+  const fullTeaTime = calculateTime(hours, minutes, 31);
+  const finishTime = calculateTime(hours, minutes, 60);
 
-  return `\n🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${formatTime(startTime)}\n⏰ 반 티 ➜ ${formatMinute(halfTeaTime)}분\n⏰ 완 티 ➜ ${formatMinute(fullTeaTime)}분\n🏁 만 시 ➜ ${formatMinute(finishTime)}분\n`;
+  return `🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${formatTime(startTime)}\n⏰ 반 티 ➜ ${formatMinute(halfTeaTime)}분\n⏰ 완 티 ➜ ${formatMinute(fullTeaTime)}분\n🏁 만 시 ➜ ${formatMinute(finishTime)}분`;
 }
 
 function formatBoardText(board) {

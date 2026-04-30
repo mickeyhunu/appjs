@@ -1,6 +1,9 @@
 const db = require('../config/db');
 
+// 한글 요일 표기용 상수(보드 헤더 생성 시 사용)
 const KOREAN_WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+// 문자열(예: "10개", "9.5ㄲ")에서 숫자만 추출해 통일된 숫자값으로 변환
 function normalizeCountText(value) {
   const text = String(value || '').trim();
   const m = text.match(/(\d+(?:\.\d+)?)/);
@@ -16,6 +19,7 @@ function extractLineCount(line, isJm) {
   return baseCount + jmBonus;
 }
 
+// 세션 배열의 종료 카운트를 모두 합산해 총 갯수 계산
 function calcTotalValue(board) {
   let total = 0;
   let found = false;
@@ -31,19 +35,23 @@ function calcTotalValue(board) {
   return total;
 }
 
+// 총 갯수 출력 포맷(정수면 정수, 소수면 소수 첫째 자리)
 function formatTotalParts(total) {
   if (total === null || total === undefined) return '';
   return Number.isInteger(total) ? String(total) : total.toFixed(1);
 }
 
+// E 보드 여부 판별(값이 명시적으로 false 인 경우만 일반 보드)
 function isEBoard(board) {
   return board.isE !== false;
 }
 
+// E 보드면 "E" 접두어를 붙임
 function getEPrefix(board) {
   return isEBoard(board) ? 'E' : '';
 }
 
+// 총 갯수 문자열 생성
 function calcTotal(board) {
   const totalValue = calcTotalValue(board);
   if (totalValue !== null) {
@@ -52,6 +60,7 @@ function calcTotal(board) {
   return `${getEPrefix(board)}${board.totalCount}개`;
 }
 
+// 총 금액 계산(E 보드/일반 보드 단가 분기)
 function calcAmount(board) {
   const parts = calcTotalValue(board);
   if (parts === null) return `${Math.round(board.totalCount * 9.9)}만원`;
@@ -79,6 +88,26 @@ function parseSessionsPayload(raw) {
     sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
     isE: parsed.isE !== false
   };
+}
+
+// 신규 보드 생성 시 사용할 isE 기본값 조회.
+// 1) 같은 매장/실장/날짜 데이터가 있으면 해당 값 사용
+// 2) 없으면 false 기본값 사용
+async function resolveIsEForBoard(storeName, workerName, dayKey) {
+  const [sameDayRows] = await db.execute(
+    `SELECT sessionsJson
+     FROM AUTO_TALK
+     WHERE storeName = ? AND workerName = ? AND dayKey = ?
+     ORDER BY dayKey DESC
+     LIMIT 1`,
+    [storeName, workerName, dayKey]
+  );
+
+  if (sameDayRows.length > 0) {
+    return parseSessionsPayload(sameDayRows[0].sessionsJson).isE;
+  }
+
+  return false;
 }
 
 function findRoomAndManager(text) {
@@ -158,6 +187,7 @@ async function saveManualBoard(req, res) {
   }
 }
 async function getOrCreateBoard(storeName, workerName, dayKey) {
+  // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
     `SELECT storeName, workerName, dayKey, roomName, totalCount, sessionsJson
      FROM AUTO_TALK
@@ -177,7 +207,9 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
     };
   }
 
-  const newBoard = { storeName, workerName, dayKey, roomNo: '', totalCount: 0, sessions: [], isE: true };
+  // 보드가 없으면 기존 이력에서 isE 기본값을 가져와 신규 보드 생성
+  const isE = await resolveIsEForBoard(storeName, workerName, dayKey);
+  const newBoard = { storeName, workerName, dayKey, roomNo: '', totalCount: 0, sessions: [], isE };
   await saveBoard(newBoard);
   return newBoard;
 }
@@ -261,6 +293,11 @@ function formatBoardText(board) {
 }
 
 async function saveChoiceEvent(req, res) {
+  // [흐름 요약]
+  // 1) 요청값 검증
+  // 2) 보드 조회/생성
+  // 3) START/END 이벤트에 따라 sessions 갱신
+  // 4) 저장 후 응답
   const payload = req.body || {};
   const managerName = String(payload.roomManagerName || payload.managerName || '').trim();
   const roomName = String(payload.roomName || '').trim();

@@ -10,8 +10,6 @@ function normalizeCountText(value) {
   return m ? Number(m[1]) : 0;
 }
 
-
-
 function extractLineCount(line, isJm) {
   const baseCount = normalizeCountText(line);
   if (!Number.isFinite(baseCount) || baseCount <= 0) return null;

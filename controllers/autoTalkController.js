@@ -57,6 +57,39 @@ function formatHeader(workerName, dayKey) {
   return `💟 ${workerName} 💟 ${month}월 ${day}일 ${weekday} 💟`;
 }
 
+function calculateTime(hours, minutes, offset) {
+  const time = new Date();
+  time.setHours(hours);
+  time.setMinutes(minutes + offset);
+  time.setSeconds(0);
+  time.setMilliseconds(0);
+  return time;
+}
+
+function formatTime(time) {
+  return `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatMinute(time) {
+  return `${String(time.getMinutes()).padStart(2, '0')}`;
+}
+
+function buildLatestDetail(latestOpen) {
+  const match = String(latestOpen.startAt || '').match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!match) {
+    return `\n🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}\n`;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const startTime = calculateTime(hours, minutes, 0);
+  const halfTeaTime = calculateTime(hours, minutes, 32);
+  const fullTeaTime = calculateTime(hours, minutes, 52);
+  const finishTime = calculateTime(hours, minutes, 81);
+
+  return `\n🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${formatTime(startTime)}\n⏰ 반 티 ➜ ${formatMinute(halfTeaTime)}분\n⏰ 완 티 ➜ ${formatMinute(fullTeaTime)}분\n🏁 만 시 ➜ ${formatMinute(finishTime)}분\n`;
+}
+
 function formatBoardText(board) {
   const rows = board.sessions.map((session, i) => {
     const no = `${i + 1}️⃣`;
@@ -67,9 +100,7 @@ function formatBoardText(board) {
   });
 
   const latestOpen = [...board.sessions].reverse().find((s) => s.status === 'START') || null;
-  const detail = latestOpen
-    ? `\n🚪 방번호 ➜ ${latestOpen.roomNo}T ${latestOpen.managerName}\n⏰ 스타트 ➜ ${latestOpen.startAt}\n⏰ 반 티 ➜ 32분\n⏰ 완 티 ➜ 52분\n🏁 만 시 ➜ 21분\n`
-    : '\n';
+  const detail = latestOpen ? buildLatestDetail(latestOpen) : '\n';
 
   return [
     formatHeader(board.workerName, board.dayKey),

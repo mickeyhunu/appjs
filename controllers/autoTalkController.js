@@ -79,15 +79,19 @@ function parseDayKey(dayKey) {
 
 
 function parseSessionsPayload(raw) {
-  const parsed = JSON.parse(raw || '[]');
-  if (Array.isArray(parsed)) {
-    return { sessions: parsed, isE: true };
-  }
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    if (Array.isArray(parsed)) {
+      return { sessions: parsed, isE: true };
+    }
 
-  return {
-    sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-    isE: parsed.isE !== false
-  };
+    return {
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      isE: parsed.isE !== false
+    };
+  } catch (error) {
+    return { sessions: [], isE: true };
+  }
 }
 
 // 신규 보드 생성 시 사용할 isE 기본값 조회.

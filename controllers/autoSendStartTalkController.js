@@ -332,12 +332,12 @@ async function saveChoiceEvent(req, res) {
 // =========================
 async function renderChoiceBoard(req, res) {
   const storeName = String(req.query.storeName || '').trim();
-  const targetRoomName = String(req.query.targetRoomName || '').trim();
   const workerName = String(req.query.workerName || '').trim();
   const dayKey = parseDayKey(req.query.dayKey);
+  const targetRoomName = String(req.query.targetRoomName || '').trim();
 
-  if (!storeName || !targetRoomName || !workerName || !dayKey) {
-    return res.status(400).json({ ok: false, error: 'storeName/targetRoomName/workerName/dayKey 필요' });
+  if (!storeName || !workerName || !dayKey|| !targetRoomName ) {
+    return res.status(400).json({ ok: false, error: 'storeName/workerName/dayKey/targetRoomName 필요' });
   }
 
   try {

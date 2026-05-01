@@ -1,5 +1,5 @@
 const express = require('express');
-const controller = require('../controllers/autoTalkController');
+const controller = require('../controllers/autoSendStartTalkController');
 
 const router = express.Router();
 

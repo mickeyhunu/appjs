@@ -7,7 +7,7 @@ const infoLiveRouter = require('./routes/infoLiveRouter');
 const infoOrderRouter = require('./routes/infoOrderRouter');
 const entryRouter = require('./routes/entryRouter');
 const attendanceRoutes = require("./routes/attendanceRoutes");
-const autoTalkRouter = require('./routes/autoTalkRouter');
+const autoSendStartTalkRouter = require('./routes/autoSendStartTalkRouter');
 const autoSendTeamtalkRouter = require('./routes/autoSendTeamtalkRouter');
 
 const app = express();
@@ -19,7 +19,7 @@ app.use('/api/info-chojoong', infoChojoongRouter);
 app.use('/api/info-live', infoLiveRouter);
 app.use('/api/info-order', infoOrderRouter);
 app.use('/api/info-entry', entryRouter);
-app.use('/api/auto-talk', autoTalkRouter);
+app.use('/api/auto-send-start-talk', autoSendStartTalkRouter);
 app.use('/api/auto-send-teamtalk', autoSendTeamtalkRouter);
 app.use("/", attendanceRoutes);
 

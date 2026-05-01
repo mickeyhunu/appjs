@@ -1,5 +1,5 @@
 const express = require('express');
-const controller = require('../controllers/autoSendTeamtalkController');
+const controller = require('../controllers/autoSendTeamTalkController');
 
 const router = express.Router();
 

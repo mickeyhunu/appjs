@@ -107,6 +107,12 @@ function findRoomAndManager(text) {
   return { roomNo: m[1], roomManagerName: m[2], endCount: m[3] };
 }
 
+function findManualStartLine(text) {
+  const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+(\d{1,2}:\d{2})$/);
+  if (!m) return null;
+  return { roomNo: m[1], roomManagerName: m[2], startAt: m[3] };
+}
+
 async function getOrCreateBoard(storeName, workerName, dayKey, targetRoomName) {
   // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
@@ -381,20 +387,36 @@ async function saveManualBoard(req, res) {
 
     for (const line of boardLines) {
       const text = String((line && line.text) || '').trim();
-      const parsed = findRoomAndManager(text);
-      if (!parsed) continue;
 
-      totalCount += normalizeCountText(parsed.endCount);
-      nextSessions.push({
-        roomNo: parsed.roomNo,
-        roomManagerName: parsed.roomManagerName,
-        targetRoomName: targetRoomName,
-        isJm: text.includes('ㅈㅁ'),
-        rawMessage: '[manual]',
-        startAt: '',
-        endCount: parsed.endCount,
-        status: 'END'
-      });
+      const parsedEnd = findRoomAndManager(text);
+      if (parsedEnd) {
+        totalCount += normalizeCountText(parsedEnd.endCount);
+        nextSessions.push({
+          roomNo: parsedEnd.roomNo,
+          roomManagerName: parsedEnd.roomManagerName,
+          targetRoomName: targetRoomName,
+          isJm: text.includes('ㅈㅁ'),
+          rawMessage: '[manual]',
+          startAt: '',
+          endCount: parsedEnd.endCount,
+          status: 'END'
+        });
+        continue;
+      }
+
+      const parsedStart = findManualStartLine(text);
+      if (parsedStart) {
+        nextSessions.push({
+          roomNo: parsedStart.roomNo,
+          roomManagerName: parsedStart.roomManagerName,
+          targetRoomName: targetRoomName,
+          isJm: false,
+          rawMessage: '[manual]',
+          startAt: parsedStart.startAt,
+          endCount: '',
+          status: 'START'
+        });
+      }
     }
 
     board.targetRoomName = targetRoomName;

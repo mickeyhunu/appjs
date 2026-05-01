@@ -141,16 +141,16 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
       storeName: row.storeName,
       workerName: row.workerName,
       dayKey: row.dayKey,
-      roomName: String(row.targetRoomName || '').trim(),
+      targetRoomName: String(row.targetRoomName || '').trim(),
+      isE: row.isE === 1,
       totalCount: Number(row.totalCount || 0),
       sessions: parseSessionsPayload(row.sessionsJson).sessions,
-      isE: row.isE === 1
     };
   }
 
   // 보드가 없으면 기존 이력에서 isE 기본값을 가져와 신규 보드 생성
   const isE = await resolveIsEForBoard(storeName, workerName, dayKey);
-  const newBoard = { storeName, workerName, dayKey, roomName: '', totalCount: 0, sessions: [], isE };
+  const newBoard = { storeName, workerName, dayKey, targetRoomName: '', totalCount: 0, sessions: [], isE };
   await saveBoard(newBoard);
   return newBoard;
 }

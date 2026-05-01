@@ -304,7 +304,8 @@ async function saveChoiceEvent(req, res) {
         lastOpenSameRoom.targetRoomName = targetRoomName;
         lastOpenSameRoom.isJm = payload.isJm === true;
         lastOpenSameRoom.rawMessage = String(payload.rawMessage || '');
-        lastOpenSameRoom.startAt = startAt;
+        // 기존 START 시간 유지(중복 START 수신 시 최초 오픈 시간 보존)
+        lastOpenSameRoom.startAt = lastOpenSameRoom.startAt || startAt;
         lastOpenSameRoom.endCount = '';
         lastOpenSameRoom.endReason = '';
         lastOpenSameRoom.status = 'START';

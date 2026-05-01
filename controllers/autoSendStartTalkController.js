@@ -320,10 +320,12 @@ async function saveChoiceEvent(req, res) {
       }
     } else if (eventType === 'END') {
       const countValue = normalizeCountText(payload.endCount);
-      board.totalCount += countValue;
 
-      const lastOpen = [...board.sessions].reverse().find((s) => s.status === 'START' && s.roomNo === payload.roomNo);
+      const lastOpen = [...board.sessions]
+        .reverse()
+        .find((s) => s.status === 'START' && s.roomNo === payload.roomNo && s.roomManagerName === roomManagerName);
       if (lastOpen) {
+        board.totalCount += countValue;
         lastOpen.roomNo = payload.roomNo;
         lastOpen.roomManagerName = roomManagerName;
         lastOpen.targetRoomName = targetRoomName;
@@ -332,16 +334,31 @@ async function saveChoiceEvent(req, res) {
         lastOpen.endCount = payload.endCount || '';
         lastOpen.status = 'END';
       } else {
-        board.sessions.push({
-          roomNo: payload.roomNo,
-          roomManagerName: roomManagerName,
-          targetRoomName: targetRoomName,
-          isJm: payload.isJm === true,
-          rawMessage: String(payload.rawMessage || ''),
-          startAt: '',
-          endCount: payload.endCount || '',
-          status: 'END'
-        });
+        const lastEndedSameRoom = [...board.sessions]
+          .reverse()
+          .find((s) => s.status === 'END' && s.roomNo === payload.roomNo && s.roomManagerName === roomManagerName);
+
+        if (lastEndedSameRoom) {
+          const prevCountValue = normalizeCountText(lastEndedSameRoom.endCount);
+          board.totalCount = Math.max(0, board.totalCount - prevCountValue + countValue);
+          lastEndedSameRoom.targetRoomName = targetRoomName;
+          lastEndedSameRoom.isJm = payload.isJm === true;
+          lastEndedSameRoom.rawMessage = String(payload.rawMessage || '');
+          lastEndedSameRoom.endCount = payload.endCount || '';
+          lastEndedSameRoom.status = 'END';
+        } else {
+          board.totalCount += countValue;
+          board.sessions.push({
+            roomNo: payload.roomNo,
+            roomManagerName: roomManagerName,
+            targetRoomName: targetRoomName,
+            isJm: payload.isJm === true,
+            rawMessage: String(payload.rawMessage || ''),
+            startAt: '',
+            endCount: payload.endCount || '',
+            status: 'END'
+          });
+        }
       }
     } else {
       return res.status(400).json({ ok: false, error: `지원하지 않는 eventType: ${eventType}` });

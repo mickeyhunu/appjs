@@ -20,32 +20,53 @@ function normalizeCountText(value) {
 }
 
 function extractLineCount(line, isJm) {
-  const baseCount = normalizeCountText(line);
-  if (!Number.isFinite(baseCount) || baseCount <= 0) return null;
-  const jmBonus = isJm || String(line || '').includes('ㅈㅁ') ? 0.1 : 0;
-  return baseCount + jmBonus;
+  const m = String(line).match(/(\d+)(?:\.(\d))?\s*ㄲ/);
+  if (!m) return null;
+  
+  let intPart = parseInt(m[1], 10);          // 정수부
+  let decPart = m[2] ? parseInt(m[2], 10) : 0; // 소수부
+
+  // ✅ 숫자 유효성 체크
+  if (!isFinite(intPart) || !isFinite(decPart)) return null;
+
+  // ✅ ㅈㅁ 규칙 적용
+  if (isJm) {
+    decPart += intPart;
+  }
+
+  return { intPart, decPart };
 }
 
 // 세션 배열의 종료 카운트를 모두 합산해 총 갯수 계산
 function calcTotalValue(board) {
-  let total = 0;
+  let intSum = 0;
+  let decSum = 0;
   let found = false;
 
-  for (const session of board.sessions || []) {
-    const parsed = extractLineCount(session.endCount, session.isJm === true);
+  for (let session of board.sessions || []) {
+    let parsed = extractLineCount(session.endCount, session.isJm === true);
     if (parsed === null) continue;
-    total += parsed;
+    intSum += parsed.intPart;
+    decSum += parsed.decPart;
     found = true;
   }
 
   if (!found) return null;
-  return total;
+  
+  // ✅ 실수로 합치지 않고, 그대로 반환
+  return { intSum, decSum };
 }
 
-// 총 갯수 출력 포맷(정수면 정수, 소수면 소수 첫째 자리)
-function formatTotalParts(total) {
-  if (total === null || total === undefined) return '';
-  return Number.isInteger(total) ? String(total) : total.toFixed(1);
+// 총 갯수 출력 포맷
+function formatTotalParts(parts) {
+  if (!parts) return "";
+  var intSum = parts.intSum;
+  var decSum = parts.decSum;
+
+  if (decSum === 0) return String(intSum);
+
+  // ✅ 2자리로 보이게: 5.10 같은 형태
+  return String(intSum) + "." + String(decSum);
 }
 
 // E 보드 여부 판별(값이 명시적으로 false 인 경우만 일반 보드)
@@ -61,6 +82,7 @@ function getEPrefix(board) {
 // 총 갯수 문자열 생성
 function calcTotal(board) {
   const totalValue = calcTotalValue(board);
+
   if (totalValue !== null) {
     return `${getEPrefix(board)}${formatTotalParts(totalValue)}개`;
   }
@@ -70,10 +92,17 @@ function calcTotal(board) {
 // 총 금액 계산(E 보드/일반 보드 단가 분기)
 function calcAmount(board) {
   const parts = calcTotalValue(board);
-  if (parts === null) return `${Math.round(board.totalCount * 9.9)}만원`;
+  if (parts === null) return `0만원`;
 
-  const tc = isEBoard(board) ? 10 : 9;
-  const amount = (Math.floor(parts) * tc) + Math.round((parts % 1) * 10) - 1;
+  const tc = isEBoard(board) ? 10 : 9; // 만원
+
+  const hours = parts.intSum;    // 정수 합
+  const decSum = parts.decSum;   // 소수 합(예: 10)
+
+  // ✅ 네 규칙 유지: (시간*TC + 소수합 - 1)
+  // 예) 2.10개 => 2*9 + 10 - 1 = 27만원
+  const amount = (hours * tc) + decSum - 1;
+
   return amount < 0 ? '0만원' : `${amount}만원`;
 }
 
@@ -265,16 +294,30 @@ async function saveChoiceEvent(req, res) {
     const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     if (eventType === 'START') {
-      board.sessions.push({
-        roomNo: payload.roomNo,
-        roomManagerName: roomManagerName,
-        targetRoomName: targetRoomName,
-        isJm: payload.isJm === true,
-        rawMessage: String(payload.rawMessage || ''),
-        startAt,
-        endCount: '',
-        status: 'START'
-      });
+      const lastOpenSameRoom = [...board.sessions]
+        .reverse()
+        .find((s) => s.status === 'START' && s.roomNo === payload.roomNo && s.roomManagerName === roomManagerName);
+
+      if (lastOpenSameRoom) {
+        // 동일 방/동일 구좌 START 중복 수신 시 신규 라인 추가 대신 기존 오픈 세션 덮어쓰기
+        lastOpenSameRoom.targetRoomName = targetRoomName;
+        lastOpenSameRoom.isJm = payload.isJm === true;
+        lastOpenSameRoom.rawMessage = String(payload.rawMessage || '');
+        lastOpenSameRoom.startAt = startAt;
+        lastOpenSameRoom.endCount = '';
+        lastOpenSameRoom.status = 'START';
+      } else {
+        board.sessions.push({
+          roomNo: payload.roomNo,
+          roomManagerName: roomManagerName,
+          targetRoomName: targetRoomName,
+          isJm: payload.isJm === true,
+          rawMessage: String(payload.rawMessage || ''),
+          startAt,
+          endCount: '',
+          status: 'START'
+        });
+      }
     } else if (eventType === 'END') {
       const countValue = normalizeCountText(payload.endCount);
       board.totalCount += countValue;

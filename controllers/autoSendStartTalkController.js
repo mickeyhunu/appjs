@@ -101,38 +101,19 @@ function parseSessionsPayload(raw) {
   }
 }
 
-// 신규 보드 생성 시 사용할 isE 기본값 조회.
-// 1) 같은 매장/실장/날짜 데이터가 있으면 해당 값 사용
-// 2) 없으면 false 기본값 사용
-async function resolveIsEForBoard(storeName, workerName, dayKey) {
-  const [sameDayRows] = await db.execute(
-    `SELECT sessionsJson
-     FROM AUTO_TALK
-     WHERE storeName = ? AND workerName = ? AND dayKey = ?
-     ORDER BY dayKey DESC
-     LIMIT 1`,
-    [storeName, workerName, dayKey]
-  );
-
-  if (sameDayRows.length > 0) {
-    return parseSessionsPayload(sameDayRows[0].sessionsJson).isE;
-  }
-
-  return false;
-}
-
 function findRoomAndManager(text) {
   const m = String(text || '').match(/^(V\d+|\d{2,3})T\s+(.+?)\s+([\d.]+ㄲ)(?:\s+ㅈㅁ)?$/);
   if (!m) return null;
   return { roomNo: m[1], roomManagerName: m[2], endCount: m[3] };
 }
-async function getOrCreateBoard(storeName, workerName, dayKey) {
+
+async function getOrCreateBoard(storeName, workerName, dayKey, targetRoomName) {
   // 현재 날짜 보드 조회: 있으면 바로 반환
   const [rows] = await db.execute(
     `SELECT storeName, workerName, dayKey, targetRoomName, isE, totalCount, sessionsJson
      FROM AUTO_TALK
-     WHERE storeName = ? AND workerName = ? AND dayKey = ?`,
-    [storeName, workerName, dayKey]
+     WHERE storeName = ? AND workerName = ? AND dayKey = ? AND targetRoomName = ?`,
+    [storeName, workerName, dayKey, targetRoomName]
   );
 
   if (rows.length > 0) {
@@ -148,9 +129,9 @@ async function getOrCreateBoard(storeName, workerName, dayKey) {
     };
   }
 
-  // 보드가 없으면 기존 이력에서 isE 기본값을 가져와 신규 보드 생성
-  const isE = await resolveIsEForBoard(storeName, workerName, dayKey);
-  const newBoard = { storeName, workerName, dayKey, targetRoomName: '', totalCount: 0, sessions: [], isE };
+  // 보드가 없으면 isE 기본값(0/false)으로 신규 보드 생성
+  const isE = false;
+  const newBoard = { storeName, workerName, dayKey, targetRoomName: '', isE, totalCount: 0, sessions: [] };
   await saveBoard(newBoard);
   return newBoard;
 }
@@ -164,7 +145,7 @@ async function saveBoard(board) {
       isE = VALUES(isE),
       totalCount = VALUES(totalCount),
       sessionsJson = VALUES(sessionsJson)`,
-    [board.storeName, board.workerName, board.dayKey, board.roomName || '', board.isE === true ? 1 : 0, board.totalCount, JSON.stringify(board.sessions || [])]
+    [board.storeName, board.workerName, board.dayKey, board.targetRoomName || '', board.isE === true ? 1 : 0, board.totalCount, JSON.stringify(board.sessions || [])]
   );
 }
 
@@ -273,7 +254,7 @@ async function saveChoiceEvent(req, res) {
 
     const board = await getOrCreateBoard(payload.storeName, payload.workerName, dayKey);
     taskLog(req, 'saveChoiceEvent', '보드 조회 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
-    board.roomName = targetRoomName || board.roomName || '';
+    board.targetRoomName = targetRoomName || board.roomName || '';
 
     const now = new Date();
     const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -343,7 +324,7 @@ async function renderChoiceBoard(req, res) {
   try {
     taskLog(req, 'renderChoiceBoard', '시작', { storeName, targetRoomName, workerName, dayKey });
     const board = await getOrCreateBoard(storeName, workerName, dayKey);
-    if (board.roomName && board.roomName !== targetRoomName) {
+    if (board.targetRoomName && board.targetRoomName !== targetRoomName) {
       return res.status(404).json({ ok: false, error: `요청 보드와 저장 보드 불일치: ${targetRoomName}` });
     }
     taskLog(req, 'renderChoiceBoard', '성공', { sessionCount: board.sessions.length, totalCount: board.totalCount });

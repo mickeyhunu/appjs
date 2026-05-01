@@ -232,7 +232,8 @@ function formatBoardText(board) {
     if (session.status === 'START') {
       return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.startAt}${jmSuffix}`;
     }
-    return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.endCount}${jmSuffix}`;
+    const endLabel = String(session.endReason || session.endCount || '').trim();
+    return `${no} ${session.roomNo}T ${session.roomManagerName} ${endLabel}${jmSuffix}`;
   });
 
   const latestOpen = [...board.sessions].reverse().find((s) => s.status === 'START') || null;
@@ -305,6 +306,7 @@ async function saveChoiceEvent(req, res) {
         lastOpenSameRoom.rawMessage = String(payload.rawMessage || '');
         lastOpenSameRoom.startAt = startAt;
         lastOpenSameRoom.endCount = '';
+        lastOpenSameRoom.endReason = '';
         lastOpenSameRoom.status = 'START';
       } else {
         board.sessions.push({
@@ -315,6 +317,7 @@ async function saveChoiceEvent(req, res) {
           rawMessage: String(payload.rawMessage || ''),
           startAt,
           endCount: '',
+          endReason: '',
           status: 'START'
         });
       }
@@ -332,6 +335,7 @@ async function saveChoiceEvent(req, res) {
         lastOpen.isJm = payload.isJm === true;
         lastOpen.rawMessage = String(payload.rawMessage || '');
         lastOpen.endCount = payload.endCount || '';
+        lastOpen.endReason = String(payload.endReason || '').trim();
         lastOpen.status = 'END';
       } else {
         const lastEndedSameRoom = [...board.sessions]
@@ -345,6 +349,7 @@ async function saveChoiceEvent(req, res) {
           lastEndedSameRoom.isJm = payload.isJm === true;
           lastEndedSameRoom.rawMessage = String(payload.rawMessage || '');
           lastEndedSameRoom.endCount = payload.endCount || '';
+          lastEndedSameRoom.endReason = String(payload.endReason || '').trim();
           lastEndedSameRoom.status = 'END';
         } else {
           board.totalCount += countValue;
@@ -356,6 +361,7 @@ async function saveChoiceEvent(req, res) {
             rawMessage: String(payload.rawMessage || ''),
             startAt: '',
             endCount: payload.endCount || '',
+            endReason: String(payload.endReason || '').trim(),
             status: 'END'
           });
         }
@@ -459,6 +465,7 @@ async function saveManualBoard(req, res) {
           rawMessage: '[manual]',
           startAt: '',
           endCount: parsedEnd.endCount,
+          endReason: '',
           status: 'END'
         });
         continue;
@@ -474,6 +481,7 @@ async function saveManualBoard(req, res) {
           rawMessage: '[manual]',
           startAt: parsedStart.startAt,
           endCount: '',
+          endReason: '',
           status: 'START'
         });
       }

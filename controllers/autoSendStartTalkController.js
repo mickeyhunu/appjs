@@ -199,15 +199,15 @@ function buildLatestDetail(latestOpen) {
 function formatBoardText(board) {
   const rows = board.sessions.map((session, i) => {
     const no = `${i + 1}️⃣`;
-    if (session.status === 'START') {
-      return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.startAt}`;
-    }
     const jmSuffix = session.isJm === true ? ' ㅈㅁ' : '';
+    if (session.status === 'START') {
+      return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.startAt}${jmSuffix}`;
+    }
     return `${no} ${session.roomNo}T ${session.roomManagerName} ${session.endCount}${jmSuffix}`;
   });
 
   const latestOpen = [...board.sessions].reverse().find((s) => s.status === 'START') || null;
-  const detail = latestOpen ? buildLatestDetail(latestOpen) : '\n';
+  const detail = latestOpen ? buildLatestDetail(latestOpen) : '';
 
   return [
     formatHeader(board.workerName, board.dayKey),
@@ -350,7 +350,7 @@ async function saveManualBoard(req, res) {
   const isE = payload.isE === true || payload.isE === 'true' || payload.isE === 1 || payload.isE === '1';
   const boardLines = Array.isArray(payload.boardLines) ? payload.boardLines : null;
 
-  if (!storeName || !workerName || !dayKey || !targetRoomName || !isE || !boardLines) {
+  if (!storeName || !workerName || !dayKey || !targetRoomName || !boardLines) {
     return res.status(400).json({ ok: false, error: 'storeName/workerName/targetRoomName/dayKey/boardLines 필요' });
   }
 

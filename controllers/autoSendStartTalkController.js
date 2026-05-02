@@ -280,19 +280,14 @@ async function saveChoiceEvent(req, res) {
   }
 
   try {
-    taskLog(req, 'saveChoiceEvent', '시작', {
-      storeName: payload.storeName,
-      workerName: payload.workerName,
-      roomNo: payload.roomNo,
-      eventType,
-      dayKey
-    });
-
     const board = await getOrCreateBoard(payload.storeName, payload.workerName, dayKey, targetRoomName);
-    taskLog(req, 'saveChoiceEvent', '보드 조회 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
 
+    const manualStartAt = String(payload.startAt || '').trim();
+    const isValidManualStartAt = /^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(manualStartAt);
     const now = new Date();
-    const startAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const startAt = isValidManualStartAt
+      ? manualStartAt
+      : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     if (eventType === 'START') {
       const lastOpenSameRoom = [...board.sessions]
@@ -372,7 +367,6 @@ async function saveChoiceEvent(req, res) {
     }
 
     await saveBoard(board);
-    taskLog(req, 'saveChoiceEvent', '보드 저장 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true });
   } catch (error) {
     taskLog(req, 'saveChoiceEvent', '실패', { error: error.message });
@@ -394,10 +388,8 @@ async function renderChoiceBoard(req, res) {
   }
 
   try {
-    taskLog(req, 'renderChoiceBoard', '시작', { storeName, workerName, dayKey, targetRoomName });
     const board = await getOrCreateBoard(storeName, workerName, dayKey, targetRoomName);
 
-    taskLog(req, 'renderChoiceBoard', '성공', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true, boardText: formatBoardText(board) });
   } catch (error) {
     taskLog(req, 'renderChoiceBoard', '실패', { error: error.message });
@@ -422,7 +414,6 @@ async function saveManualBoard(req, res) {
   }
 
   try {
-    taskLog(req, 'saveManualBoard', '시작', { targetRoomName, dayKey, lines: boardLines.length });
     const [rows] = await db.execute(
       `SELECT storeName, workerName, dayKey, targetRoomName, isE, totalCount, sessionsJson
       FROM AUTO_SEND_STARTTALK
@@ -494,7 +485,6 @@ async function saveManualBoard(req, res) {
     board.sessions = nextSessions;
 
     await saveBoard(board);
-    taskLog(req, 'saveManualBoard', '보드 저장 완료', { sessionCount: board.sessions.length, totalCount: board.totalCount });
     return res.json({ ok: true });
   } catch (error) {
     taskLog(req, 'saveManualBoard', '실패', { error: error.message });

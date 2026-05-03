@@ -9,6 +9,7 @@ const entryRouter = require('./routes/entryRouter');
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const autoSendStartTalkRouter = require('./routes/autoSendStartTalkRouter');
 const autoSendTeamTalkRouter = require('./routes/autoSendTeamTalkRouter');
+const numberRouter = require('./routes/numberRouter');
 
 const app = express();
 app.use(express.json()); // JSON 바디 파싱
@@ -21,6 +22,7 @@ app.use('/api/info-order', infoOrderRouter);
 app.use('/api/info-entry', entryRouter);
 app.use('/api/auto-send-starttalk', autoSendStartTalkRouter);
 app.use('/api/auto-send-teamtalk', autoSendTeamTalkRouter);
+app.use('/api', numberRouter);
 app.use("/", attendanceRoutes);
 
 // 서버 시작

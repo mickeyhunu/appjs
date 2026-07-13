@@ -2,6 +2,11 @@ const db = require('../config/db');
 
 const STATUS_RUNNING = 'RUNNING';
 const STATUS_STOPPED = 'STOPPED';
+const DEFAULT_RUNNING_LOCK_TIMEOUT_MINUTES = 5;
+
+function getRunningLockTimeoutMinutes() {
+  return toPositiveInt(process.env.AUTO_SEND_TEAMTALK_LOCK_TIMEOUT_MINUTES) || DEFAULT_RUNNING_LOCK_TIMEOUT_MINUTES;
+}
 
 function toPositiveInt(value) {
   const num = Number(value);
@@ -40,6 +45,19 @@ exports.getDueJobs = async (req, res) => {
   try {
     conn = await db.getConnection();
     await conn.beginTransaction();
+
+    const runningLockTimeoutMinutes = getRunningLockTimeoutMinutes();
+
+    await conn.execute(
+      `UPDATE AUTO_SEND_TEAMTALK
+       SET isRunning = 0,
+           lastError = 'stale running lock released'
+       WHERE status = ?
+         AND isRunning = 1
+         AND nextSendAt <= DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [STATUS_RUNNING, runningLockTimeoutMinutes]
+    );
+
 
     const [rows] = await conn.execute(
       `SELECT jobId, storeNo, targetRoomName, intervalMinutes, nextSendAt

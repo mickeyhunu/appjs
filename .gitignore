@@ -1,1 +1,4 @@
 .env
+
+# Google service account credentials (keep local only)
+config/service-account.json

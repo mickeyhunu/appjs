@@ -18,7 +18,7 @@ function readRequiredEnv(name) {
 }
 
 const pool = mysql.createPool({
-    host: process.env.DB_HOST?.trim() || 'basic-database.ctq24wi4608y.us-east-2.rds.amazonaws.com',
+  host: process.env.DB_HOST?.trim() || 'basic-database.ctq24wi4608y.us-east-2.rds.amazonaws.com',
   port: toPositiveInt(process.env.DB_PORT, 3306),
   user: readRequiredEnv('DB_USER'),
   password: readRequiredEnv('DB_PASSWORD'),

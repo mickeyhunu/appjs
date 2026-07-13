@@ -14,6 +14,16 @@ function isValidJobId(value) {
   return Number.isInteger(num) && num > 0;
 }
 
+async function rollbackQuietly(conn) {
+  if (!conn) return;
+
+  try {
+    await conn.rollback();
+  } catch (rollbackError) {
+    console.error('[AUTO_SEND_TEAMTALK] rollback 실패:', rollbackError.message);
+  }
+}
+
 
 function normalizeDateTime(value) {
   const text = String(value || '').trim();
@@ -57,7 +67,7 @@ exports.getDueJobs = async (req, res) => {
     await conn.commit();
     res.json({ success: true, data: rows });
   } catch (error) {
-    if (conn) await conn.rollback();
+    await rollbackQuietly(conn);
     console.error('[AUTO_SEND_TEAMTALK] due 조회 오류:', error);
     res.status(500).json({ success: false, error: 'due 목록 조회 중 오류가 발생했습니다.' });
   } finally {

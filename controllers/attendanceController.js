@@ -11,7 +11,7 @@ const storeRanges = {
   "유앤미": "P2:T",
   "도파민": "U2:Y",
   "제우스": "Z2:AD",
-  "드라마": "AE2:AI",
+  "갤럭시": "AE2:AI",
   "": "AJ2:AN",
   "": "AO2:AS",
   "독고": "AT2:AX",

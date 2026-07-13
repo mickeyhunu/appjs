@@ -8,9 +8,9 @@ function toPositiveInt(value, fallback) {
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'basic-database.ctq24wi4608y.us-east-2.rds.amazonaws.com',
   port: toPositiveInt(process.env.DB_PORT, 3306),
-  user: process.env.DB_USER || 'master',
-  password: process.env.DB_PASSWORD || 'lsh09844**',
-  database: process.env.DB_NAME || 'chatBot_DB',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: toPositiveInt(process.env.DB_CONNECTION_LIMIT, 10),
   queueLimit: toPositiveInt(process.env.DB_QUEUE_LIMIT, 0),

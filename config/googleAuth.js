@@ -10,14 +10,30 @@ function normalizePrivateKey(privateKey) {
   return privateKey?.replace(/\\n/g, "\n");
 }
 
-function loadCredentialsFromEnv() {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+function parseCredentialsJson(json, source) {
+  const trimmedJson = json?.trim();
+
+  if (!trimmedJson) {
+    throw new Error(`Google 서비스 계정 JSON이 비어 있습니다: ${source}`);
   }
 
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64) {
-    const json = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64, "base64").toString("utf8");
-    return JSON.parse(json);
+  try {
+    return JSON.parse(trimmedJson);
+  } catch (error) {
+    throw new Error(`Google 서비스 계정 JSON을 읽을 수 없습니다 (${source}): ${error.message}`);
+  }
+}
+
+function loadCredentialsFromEnv() {
+  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
+  if (serviceAccountJson) {
+    return parseCredentialsJson(serviceAccountJson, "GOOGLE_SERVICE_ACCOUNT_JSON");
+  }
+
+  const serviceAccountJsonBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64?.trim();
+  if (serviceAccountJsonBase64) {
+    const json = Buffer.from(serviceAccountJsonBase64, "base64").toString("utf8");
+    return parseCredentialsJson(json, "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64");
   }
 
   if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
@@ -39,7 +55,7 @@ function loadCredentialsFromFile() {
     throw new Error(`Google 서비스 계정 키 파일을 찾을 수 없습니다: ${keyFile}`);
   }
 
-  return JSON.parse(fs.readFileSync(keyFile, "utf8"));
+  return parseCredentialsJson(fs.readFileSync(keyFile, "utf8"), keyFile);
 }
 
 function loadCredentials() {
@@ -69,4 +85,4 @@ async function getClient() {
   return client;
 }
 
-module.exports = { getClient };
+module.exports = { getClient, loadCredentials, loadCredentialsFromFile, parseCredentialsJson };

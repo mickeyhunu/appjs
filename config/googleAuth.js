@@ -10,11 +10,21 @@ function normalizePrivateKey(privateKey) {
   return privateKey?.replace(/\\n/g, "\n");
 }
 
+function getSetupHint(source) {
+  return [
+    `Google 서비스 계정 키를 설정해주세요. (${source})`,
+    "1) Google Cloud Console에서 service_account JSON 키를 내려받습니다.",
+    `2) ${DEFAULT_KEY_FILE} 파일에 JSON 전체 내용을 저장하거나,`,
+    "3) GOOGLE_SERVICE_ACCOUNT_JSON 또는 GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 환경 변수에 JSON을 설정합니다.",
+    "4) 해당 서비스 계정 이메일을 Google 스프레드시트에 편집자로 공유합니다.",
+  ].join("\n");
+}
+
 function parseCredentialsJson(json, source) {
   const trimmedJson = json?.trim();
 
   if (!trimmedJson) {
-    throw new Error(`Google 서비스 계정 JSON이 비어 있습니다: ${source}`);
+    throw new Error(getSetupHint(`${source} 값이 비어 있습니다.`));
   }
 
   try {
@@ -52,7 +62,7 @@ function loadCredentialsFromFile() {
     : DEFAULT_KEY_FILE;
 
   if (!fs.existsSync(keyFile)) {
-    throw new Error(`Google 서비스 계정 키 파일을 찾을 수 없습니다: ${keyFile}`);
+    throw new Error(getSetupHint(`${keyFile} 파일을 찾을 수 없습니다.`));
   }
 
   return parseCredentialsJson(fs.readFileSync(keyFile, "utf8"), keyFile);

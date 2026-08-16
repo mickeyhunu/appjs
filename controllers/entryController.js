@@ -78,6 +78,14 @@ exports.addWorker = async (req, res) => {
       [storeNo, workerName]
     );
 
+    await db.execute(
+      `INSERT INTO ENTRY_ALLDAY (storeNo, workerName, lastAttendanceAt)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE
+         lastAttendanceAt = CURRENT_TIMESTAMP`,
+      [storeNo, workerName]
+    );
+    
     res.status(201).json({ message: '작업자가 추가되었습니다.' });
   } catch (error) {
     console.error('[ERROR] addWorker:', error);

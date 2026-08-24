@@ -11,7 +11,7 @@ const storeRanges = {
   "유앤미": "P2:T",
   "도파민": "U2:Y",
   "제우스": "Z2:AD",
-  "갤럭시": "AE2:AI",
+  "아우라": "AE2:AI",
   "": "AJ2:AN",
   "": "AO2:AS",
   "독고": "AT2:AX",
@@ -27,7 +27,7 @@ function getSheetName() {
   const currentHour = now.getHours();
   const currentDate = localTime.toISOString().split("T")[0].replace(/-/g, "");
 
-  if (currentHour >= 15) {
+  if (currentHour >= 18) {
     if (SHEET_DATE !== currentDate) {
       console.log(`시트탐색 날짜 변경: ${SHEET_DATE} -> ${currentDate}`);
     }

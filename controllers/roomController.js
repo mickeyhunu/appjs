@@ -12,6 +12,7 @@ exports.getRoomInfo = async (req, res) => {
     R.roomDetail,
     S.storeName, 
     S.storeAddress,
+    S.storeEmoji,
     DATE_FORMAT(R.updatedAt, '%Y-%m-%d %H:%i') AS updatedAt
     FROM INFO_ROOM R
     JOIN INFO_STORE S ON R.storeNo = S.storeNo
